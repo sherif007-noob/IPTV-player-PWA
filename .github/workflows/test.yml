@@ -42,9 +42,5 @@ jobs:
       - name: Test direct MKV URL seeking with HTTP Range
         run: node scripts/test-direct-mkv-seek.mjs
 
-      - name: Run temporary VOD seeking patch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: node scripts/patch-vod-seeking.mjs
-
       - name: Verify built server loads
         run: node --check dist/server.cjs
