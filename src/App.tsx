@@ -260,12 +260,10 @@ export default function App() {
       const channel = liveChannels.find((c) => c.stream_id === Number(item.id));
       url = channel?.direct_source || xtreamService.getStreamUrl('live', item.id);
     } else if (item.type === 'vod') {
-      let ext = item.container_extension || 'mp4';
-      if (ext === 'mkv') ext = 'mp4';
+      const ext = item.container_extension;
       url = xtreamService.getStreamUrl('vod', item.id, ext);
     } else if (item.type === 'series' && seriesMeta) {
-      let ext = seriesMeta.episode.container_extension || 'mp4';
-      if (ext === 'mkv') ext = 'mp4';
+      const ext = seriesMeta.episode.container_extension;
       url = xtreamService.getStreamUrl('series', seriesMeta.episode.id, ext);
     }
 
