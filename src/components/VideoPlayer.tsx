@@ -588,22 +588,88 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
   }, [triggerControls]);
 
+  // Seek helper for transcoded MKV VOD/Series. The browser cannot seek inside the
+  // non-seekable fragmented-MP4 response, so restart the proxy at the requested
+  // absolute position and let the server perform an FFmpeg -ss seek upstream.
+  const seekToPosition = useCallback(
+    (targetSeconds: number) => {
+      const video = videoRef.current;
+      if (!video || isLive || !Number.isFinite(targetSeconds)) return false;
+
+      const target = Math.max(0, Math.floor(targetSeconds));
+      let parsed: URL;
+      try {
+        parsed = new URL(activeUrl, window.location.href);
+      } catch {
+        return false;
+      }
+
+      if (!parsed.pathname.endsWith('/api/xtream/stream')) return false;
+      const upstream = parsed.searchParams.get('url');
+      if (!upstream) return false;
+
+      try {
+        if (!/\.mkv$/i.test(new URL(upstream).pathname)) return false;
+      } catch {
+        return false;
+      }
+
+      // Avoid reloading when the target is effectively the current transcoded start.
+      const currentStart = Number(parsed.searchParams.get('start') || '0');
+      if (Number.isFinite(currentStart) && Math.abs(currentStart - target) < 1) return true;
+
+      const wasPaused = video.paused;
+      parsed.searchParams.set('start', String(target));
+
+      // The activeUrl reload effect applies initialTimeRef after metadata. Clear it
+      // so a user seek is not immediately overwritten by the original resume point.
+      initialTimeRef.current = 0;
+      setCurrentTime(target);
+      setIsBuffering(true);
+      setPlaybackError(null);
+      setActiveUrl(parsed.toString());
+
+      setSeekFeedback(target > currentStart ? `+${target - currentStart}s` : `-${currentStart - target}s`);
+      triggerControls();
+      setTimeout(() => setSeekFeedback(null), 1000);
+
+      // Preserve pause/play state after the new source loads. The initialization
+      // effect already calls safePlay(), so explicitly pause only after metadata.
+      if (wasPaused) {
+        const pauseAfterLoad = () => {
+          safePause();
+          video.removeEventListener('loadedmetadata', pauseAfterLoad);
+        };
+        video.addEventListener('loadedmetadata', pauseAfterLoad);
+      }
+
+      console.log(`Transcoded VOD seek: target=${target}s url=${parsed.toString()}`);
+      return true;
+    },
+    [activeUrl, isLive, safePause, triggerControls]
+  );
+
   // 10-Second Seek Handler (Arrow keys / Remote buttons)
   const handleSeek = useCallback(
     (offsetSeconds: number) => {
-      if (!videoRef.current || isLive) return;
+      const video = videoRef.current;
+      if (!video || isLive) return;
       const newTime = Math.max(
         0,
-        Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + offsetSeconds)
+        Math.min(video.duration || 0, video.currentTime + offsetSeconds)
       );
-      videoRef.current.currentTime = newTime;
+
+      // For transcoded MKV VOD/Series, perform a server-side seek instead of
+      // assigning video.currentTime on a non-seekable live FFmpeg output.
+      if (seekToPosition(newTime)) return;
+
+      video.currentTime = newTime;
       setCurrentTime(newTime);
       setSeekFeedback(offsetSeconds > 0 ? `+${offsetSeconds}s` : `${offsetSeconds}s`);
       triggerControls();
-
       setTimeout(() => setSeekFeedback(null), 1000);
     },
-    [isLive, triggerControls]
+    [isLive, seekToPosition, triggerControls]
   );
 
   // Play / Pause toggle
@@ -1424,11 +1490,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               id="timeline-scrubber-track"
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
-                const pos = (e.clientX - rect.left) / rect.width;
+                const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                 if (videoRef.current && duration > 0) {
-                  videoRef.current.currentTime = pos * duration;
-                  setCurrentTime(pos * duration);
-                  triggerControls();
+                  const target = pos * duration;
+                  if (!seekToPosition(target)) {
+                    videoRef.current.currentTime = target;
+                    setCurrentTime(target);
+                    triggerControls();
+                  }
                 }
               }}
               className="relative w-full h-3 bg-slate-800/90 rounded-full cursor-pointer overflow-hidden group hover:h-4 transition-all"
