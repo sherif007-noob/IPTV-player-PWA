@@ -82,7 +82,7 @@ async function startServer() {
       .join("\r\n");
 
     if (startSeconds > 0) {
-      const args = ["-hide_banner", "-loglevel", "info", "-nostdin", "-ss", String(startSeconds), "-user_agent", upstreamHeaders["User-Agent"] || PROVIDER_USER_AGENT, ...(upstreamHeaders.Referer ? ["-referer", upstreamHeaders.Referer] : []), ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\r\n`] : []), "-http_seekable", "1", "-http_persistent", "0", "-rw_timeout", "30000000", "-i", streamUrl, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency", "-profile:v", "main", "-pix_fmt", "yuv420p", "-bf", "0", "-refs", "1", "-g", "48", "-keyint_min", "48", "-sc_threshold", "0", "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-avoid_negative_ts", "make_zero", "-movflags", "+frag_keyframe+empty_moov+default_base_moof", "-flush_packets", "1", "-f", "mp4", "pipe:1"];
+      const args = ["-hide_banner", "-loglevel", "info", "-nostdin", "-ss", String(startSeconds), "-user_agent", upstreamHeaders["User-Agent"] || PROVIDER_USER_AGENT, ...(upstreamHeaders.Referer ? ["-referer", upstreamHeaders.Referer] : []), ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\r\n`] : []), "-http_seekable", "1", "-http_persistent", "0", "-multiple_requests", "0", "-rw_timeout", "120000000", "-seek_timestamp", "1", "-i", streamUrl, "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency", "-profile:v", "main", "-pix_fmt", "yuv420p", "-bf", "0", "-refs", "1", "-g", "48", "-keyint_min", "48", "-sc_threshold", "0", "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-avoid_negative_ts", "make_zero", "-movflags", "+frag_keyframe+empty_moov+default_base_moof", "-flush_packets", "1", "-f", "mp4", "pipe:1"];
       console.log(`Starting direct MKV FFmpeg seek: start=${startSeconds}s url=${streamUrl}`);
       return startFfmpeg(args, res, startSeconds);
     }
@@ -90,7 +90,7 @@ async function startServer() {
     let upstream: Response;
     try {
       console.log(`Fetching MKV upstream before FFmpeg: ${streamUrl}`);
-      upstream = await fetch(streamUrl, { method: "GET", headers: upstreamHeaders, redirect: "follow", signal: AbortSignal.timeout(30000) });
+      upstream = await fetch(streamUrl, { method: "GET", headers: upstreamHeaders, redirect: "follow" });
     } catch (err: any) {
       console.warn(`MKV upstream fetch failed: ${err?.message || err}`);
       if (!res.headersSent) res.status(502).send(`Upstream MKV connection failed: ${err?.message || "connection failed"}`);

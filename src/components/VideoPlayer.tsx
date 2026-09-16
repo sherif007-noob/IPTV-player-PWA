@@ -96,6 +96,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [isBuffering, setIsBuffering] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [activeUrl, setActiveUrl] = useState<string>(streamUrl);
+  const pendingSourceUrlRef = useRef<string | null>(null);
+  const [sourceRevision, setSourceRevision] = useState(0);
   const [bufferingSeconds, setBufferingSeconds] = useState<number>(0);
   const hlsNetworkRetryCount = useRef<number>(0);
   const hlsMediaRetryCount = useRef<number>(0);
@@ -272,6 +274,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   // Sync activeUrl when streamUrl prop changes
   useEffect(() => {
+    pendingSourceUrlRef.current = null;
     setActiveUrl(streamUrl);
     setPlaybackError(null);
     setBufferingSeconds(0);
@@ -289,7 +292,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Save progress helper (stored in ref to prevent re-attaching video player)
   const recordProgress = useCallback(() => {
     if (!videoRef.current) return;
-    const curr = videoRef.current.currentTime;
+    const rawCurr = videoRef.current.currentTime;
+    const sourceStart = Number(new URL(activeUrl, window.location.href).searchParams.get('start') || '0');
+    const curr = Number.isFinite(sourceStart) && sourceStart > 0 ? rawCurr + sourceStart : rawCurr;
     const dur = videoRef.current.duration || duration;
 
     if (isLive) {
@@ -369,16 +374,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   // Video stream initialization with HLS adaptive bitrate and hardware buffer optimization
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !activeUrl) return;
+    const sourceUrl = pendingSourceUrlRef.current || activeUrl;
+    if (!video || !sourceUrl) return;
+    pendingSourceUrlRef.current = null;
 
     let hls: Hls | null = null;
     setIsBuffering(true);
     setPlaybackError(null);
 
-    const isMp4OrWebm = activeUrl.endsWith('.mp4') || activeUrl.endsWith('.webm');
+    const isMp4OrWebm = /\.(mp4|webm)(?:\?|$)/i.test(sourceUrl);
     const isHlsStream =
-      activeUrl.includes('.m3u8') ||
-      (!isMp4OrWebm && (activeUrl.includes('/live/') || isLive));
+      sourceUrl.includes('.m3u8') ||
+      (!isMp4OrWebm && (sourceUrl.includes('/live/') || isLive));
 
     if (isHlsStream && Hls.isSupported()) {
       hls = new Hls({
@@ -421,7 +428,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       });
 
       hlsRef.current = hls;
-      hls.loadSource(activeUrl);
+      hls.loadSource(sourceUrl);
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
@@ -518,7 +525,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       });
     } else if (isHlsStream && video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native Safari / WebKit HLS playback
-      video.src = activeUrl;
+      video.src = sourceUrl;
       video.load();
       const handleLoadedMetadata = () => {
         if (initialTimeRef.current > 0) {
@@ -531,7 +538,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       safePlay();
     } else {
       // Direct MP4 / MKV / WebM standard video playback for VOD & Series
-      video.src = activeUrl;
+      video.src = sourceUrl;
       video.preload = 'auto';
       video.load();
 
@@ -567,7 +574,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         } catch {}
       }
     };
-  }, [activeUrl, isLive, safePlay, safePause, restartHlsStream]);
+  }, [activeUrl, sourceRevision, isLive, safePlay, safePause, restartHlsStream]);
 
   // Handle Controls auto-hide (Magic Remote / pointer inactivity)
   const triggerControls = useCallback(() => {
@@ -607,47 +614,48 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (!parsed.pathname.endsWith('/api/xtream/stream')) return false;
       const upstream = parsed.searchParams.get('url');
       if (!upstream) return false;
-
       try {
         if (!/\.mkv$/i.test(new URL(upstream).pathname)) return false;
       } catch {
         return false;
       }
 
-      // Avoid reloading when the target is effectively the current transcoded start.
       const currentStart = Number(parsed.searchParams.get('start') || '0');
       if (Number.isFinite(currentStart) && Math.abs(currentStart - target) < 1) return true;
 
       const wasPaused = video.paused;
-      parsed.searchParams.set('start', String(target));
+      const seekUrl = new URL(parsed.toString());
+      seekUrl.searchParams.set('start', String(target));
+      seekUrl.searchParams.delete('_r');
+      seekUrl.searchParams.delete('_t');
+      const nextUrl = seekUrl.toString();
 
-      // The activeUrl reload effect applies initialTimeRef after metadata. Clear it
-      // so a user seek is not immediately overwritten by the original resume point.
+      pendingSourceUrlRef.current = nextUrl;
       initialTimeRef.current = 0;
       setCurrentTime(target);
       setIsBuffering(true);
       setPlaybackError(null);
-      setActiveUrl(parsed.toString());
+      setActiveUrl(nextUrl);
+      setSourceRevision((value) => value + 1);
 
-      setSeekFeedback(target > currentStart ? `+${target - currentStart}s` : `-${currentStart - target}s`);
+      setSeekFeedback((target > currentStart ? '+' : '-') + Math.abs(target - currentStart) + 's');
       triggerControls();
       setTimeout(() => setSeekFeedback(null), 1000);
 
-      // Preserve pause/play state after the new source loads. The initialization
-      // effect already calls safePlay(), so explicitly pause only after metadata.
       if (wasPaused) {
         const pauseAfterLoad = () => {
           safePause();
           video.removeEventListener('loadedmetadata', pauseAfterLoad);
         };
-        video.addEventListener('loadedmetadata', pauseAfterLoad);
+        video.addEventListener('loadedmetadata', pauseAfterLoad, { once: true });
       }
 
-      console.log(`Transcoded VOD seek: target=${target}s url=${parsed.toString()}`);
+      console.log('Transcoded VOD seek: target=' + target + 's url=' + nextUrl);
       return true;
     },
     [activeUrl, isLive, safePause, triggerControls]
   );
+;
 
   // 10-Second Seek Handler (Arrow keys / Remote buttons)
   const handleSeek = useCallback(
@@ -913,8 +921,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 break;
               case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
                 // Auto-fallback from MKV to MP4 since many browsers drop MKV support
-                if (activeUrl.includes('.mkv')) {
-                  console.warn('MKV playback failed, auto-switching to MP4 container fallback...');
+                if (activeUrl.includes('.mkv') && !activeUrl.includes('/api/xtream/stream')) {
+                  console.warn('Raw MKV playback failed, trying provider MP4 fallback...');
                   switchContainerExtension('mp4');
                   return;
                 }
