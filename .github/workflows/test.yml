@@ -1,0 +1,38 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript check
+        run: npm run lint
+
+      - name: Build frontend and server
+        run: npm run build
+
+      - name: Verify FFmpeg binary
+        run: |
+          node -e "const ffmpeg = require('ffmpeg-static'); if (!ffmpeg) throw new Error('ffmpeg-static did not resolve'); console.log('FFmpeg:', ffmpeg)"
+          node "$(node -e "process.stdout.write(require('ffmpeg-static'))")" -version
+
+      - name: Verify built server loads
+        run: node --check dist/server.cjs
