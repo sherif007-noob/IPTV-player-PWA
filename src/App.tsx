@@ -41,6 +41,7 @@ import { DetailsModal } from './components/DetailsModal';
 import { VideoPlayer } from './components/VideoPlayer';
 import { ServerLoginModal } from './components/ServerLoginModal';
 import { RemoteControlHUD } from './components/RemoteControlHUD';
+import { OfflineIndicator } from './components/OfflineIndicator';
 
 export default function App() {
   const storage = useStorage();
@@ -153,19 +154,27 @@ export default function App() {
         setCredentials(xtreamService.getCredentials());
         setIsDemo(xtreamService.getIsDemo());
 
-        // Refresh categories and catalog streams on startup
-        const [liveCats, vodCats, seriesCats, liveStreams, vodStreams, seriesStreams] = await Promise.allSettled([
+        // Refresh categories and initial live stream catalog on startup
+        const [liveCats, vodCats, seriesCats, liveStreams] = await Promise.allSettled([
           xtreamService.getCategories('live'),
           xtreamService.getCategories('vod'),
           xtreamService.getCategories('series'),
           xtreamService.getLiveStreams('all'),
-          xtreamService.getVodStreams('all'),
-          xtreamService.getSeries('all'),
         ]);
 
         if (liveStreams.status === 'fulfilled') setLiveChannels(liveStreams.value);
-        if (vodStreams.status === 'fulfilled') setMovies(vodStreams.value);
-        if (seriesStreams.status === 'fulfilled') setSeries(seriesStreams.value);
+        if (liveCats.status === 'fulfilled') setCategories(liveCats.value);
+
+        // Preload VOD & Series in background without blocking initial UI interactivity
+        setTimeout(() => {
+          xtreamService.getVodStreams('all').then((vods) => {
+            if (vods && vods.length > 0) setMovies(vods);
+          }).catch((err) => console.warn('Background VOD preload notice:', err.message));
+
+          xtreamService.getSeries('all').then((sList) => {
+            if (sList && sList.length > 0) setSeries(sList);
+          }).catch((err) => console.warn('Background Series preload notice:', err.message));
+        }, 1000);
       } catch (err) {
         console.warn('Initial authentication attempt:', err);
         setCredentials(xtreamService.getCredentials());
@@ -251,10 +260,12 @@ export default function App() {
       const channel = liveChannels.find((c) => c.stream_id === Number(item.id));
       url = channel?.direct_source || xtreamService.getStreamUrl('live', item.id);
     } else if (item.type === 'vod') {
-      const ext = item.container_extension || 'mkv';
+      let ext = item.container_extension || 'mp4';
+      if (ext === 'mkv') ext = 'mp4';
       url = xtreamService.getStreamUrl('vod', item.id, ext);
     } else if (item.type === 'series' && seriesMeta) {
-      const ext = seriesMeta.episode.container_extension || 'mkv';
+      let ext = seriesMeta.episode.container_extension || 'mp4';
+      if (ext === 'mkv') ext = 'mp4';
       url = xtreamService.getStreamUrl('series', seriesMeta.episode.id, ext);
     }
 
@@ -1042,6 +1053,9 @@ export default function App() {
         }}
         isPlayerOpen={!!activePlayer}
       />
+
+      {/* 7. PWA Offline Toast */}
+      <OfflineIndicator />
 
       {/* 7. TV Exit Confirmation Dialog (when back is pressed at root) */}
       {showExitConfirm && (

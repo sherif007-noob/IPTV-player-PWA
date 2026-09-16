@@ -1,6 +1,6 @@
 {
   "name": "WebOS Xtream IPTV Player",
-  "description": "High-performance LG TV webOS IPTV player supporting Xtream Code playlists, Live TV, 4K VOD, Series with episode tracking, and Magic Remote navigation.",
+  "description": "High-performance cross-platform IPTV PWA and LG webOS player supporting Xtream Code playlists, Live TV, 4K VOD, Series with episode tracking, offline PWA installability, and adaptive streaming.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

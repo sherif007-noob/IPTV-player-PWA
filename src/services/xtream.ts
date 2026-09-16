@@ -28,7 +28,7 @@ export const DEFAULT_USER_CREDENTIALS: XtreamCredentials = {
   username: 'Nasser0100',
   password: '01008850042',
   rememberMe: true,
-  proxyEnabled: false,
+  proxyEnabled: true,
   autoRefreshHours: 12,
 };
 
@@ -79,7 +79,7 @@ export class XtreamService {
           this.credentials = {
             ...parsed,
             password,
-            proxyEnabled: isFileProtocol ? false : (parsed.proxyEnabled ?? false),
+            proxyEnabled: isFileProtocol ? false : (parsed.proxyEnabled ?? true),
           };
           this.isDemoMode = false;
           this.setupAutoRefresh();
@@ -196,41 +196,82 @@ export class XtreamService {
 
   private async fetchApi(url: string, useProxy: boolean = true): Promise<any> {
     const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
+    const isHttpsBrowser = typeof window !== 'undefined' && window.location.protocol === 'https:';
     
     // On packaged TV apps (file:// protocol), local relative /api/ proxy endpoints do NOT exist on the TV.
     // WebOS packaged apps have direct access to external HTTP servers.
-    const shouldProxy = useProxy && !isFileProtocol;
-    const primaryUrl = shouldProxy
-      ? `/api/xtream/proxy?url=${encodeURIComponent(url)}`
+    const baseUrl = typeof window !== 'undefined' && !isFileProtocol ? window.location.origin : '';
+    
+    // Force proxy if we are in an HTTPS browser and the target URL is HTTP (to prevent Mixed Content blocks)
+    let shouldProxy = useProxy && !isFileProtocol;
+    if (isHttpsBrowser && url.startsWith('http:')) {
+      shouldProxy = true;
+    }
+    
+    let primaryUrl = shouldProxy
+      ? `${baseUrl}/api/xtream/proxy?url=${encodeURIComponent(url)}`
       : url;
+      
+    if (shouldProxy && this.credentials) {
+      if (this.credentials.userAgent) primaryUrl += `&ua=${encodeURIComponent(this.credentials.userAgent)}`;
+      if (this.credentials.referer) primaryUrl += `&referer=${encodeURIComponent(this.credentials.referer)}`;
+      if (this.credentials.origin) primaryUrl += `&origin=${encodeURIComponent(this.credentials.origin)}`;
+    }
 
-    let response: Response;
-    try {
-      response = await fetch(primaryUrl, {
-        headers: {
-          Accept: 'application/json, text/plain, */*',
-        },
-      });
-    } catch (primaryErr: any) {
-      // If proxy was attempted and failed, try direct fetch as fallback
-      if (shouldProxy) {
-        try {
-          console.warn('Proxy attempt failed, falling back to direct IPTV server request:', url);
-          response = await fetch(url, {
-            headers: {
-              Accept: 'application/json, text/plain, */*',
-            },
-          });
-        } catch (directErr: any) {
-          throw new Error(
-            `Network error reaching IPTV server: ${directErr.message || 'Connection lost'}`
-          );
+    let response: Response | null = null;
+    let lastError: any = null;
+
+    // Retry up to 2 times with backoff if request fails
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 45000) : null;
+
+        response = await fetch(primaryUrl, {
+          headers: {
+            Accept: 'application/json, text/plain, */*',
+          },
+          signal: controller?.signal,
+        });
+
+        if (timeoutId) clearTimeout(timeoutId);
+
+        if (response && response.ok) {
+          break; // Successful response
+        } else if (response && response.status >= 500 && attempt < 2) {
+          // Server error, wait and retry
+          await new Promise((res) => setTimeout(res, 500 * (attempt + 1)));
+          continue;
+        } else if (response) {
+          break;
         }
-      } else {
-        throw new Error(
-          `Network error reaching IPTV server: ${primaryErr.message || 'Connection lost'}`
-        );
+      } catch (err: any) {
+        lastError = err;
+        if (attempt < 2) {
+          await new Promise((res) => setTimeout(res, 600 * (attempt + 1)));
+          continue;
+        }
       }
+    }
+
+    // Fallback: only try direct fetch if on HTTP or file:// (never attempt insecure direct HTTP on HTTPS web browsers)
+    if (!response && shouldProxy && (!isHttpsBrowser || url.startsWith('https:'))) {
+      try {
+        console.warn('Proxy attempt failed, attempting direct IPTV server request:', url);
+        response = await fetch(url, {
+          headers: {
+            Accept: 'application/json, text/plain, */*',
+          },
+        });
+      } catch (directErr: any) {
+        lastError = directErr;
+      }
+    }
+
+    if (!response) {
+      throw new Error(
+        `Network error reaching IPTV server: ${lastError?.message || 'Connection lost'}`
+      );
     }
 
     if (!response.ok) {
@@ -612,7 +653,24 @@ export class XtreamService {
     extension?: string
   ): string {
     const streamTarget = this.getDirectStreamTarget(type, streamId, extension);
-    // Strictly direct stream on webOS TV (no proxy fallback)
+    const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
+    const isHttpsBrowser = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    
+    let shouldProxy = !isFileProtocol && this.credentials?.proxyEnabled !== false;
+    if (isHttpsBrowser && streamTarget.startsWith('http:')) {
+      shouldProxy = true;
+    }
+
+    if (shouldProxy) {
+      const baseUrl = typeof window !== 'undefined' && !isFileProtocol ? window.location.origin : '';
+      let proxyUrl = `${baseUrl}/api/xtream/stream?url=${encodeURIComponent(streamTarget)}`;
+      if (this.credentials) {
+        if (this.credentials.userAgent) proxyUrl += `&ua=${encodeURIComponent(this.credentials.userAgent)}`;
+        if (this.credentials.referer) proxyUrl += `&referer=${encodeURIComponent(this.credentials.referer)}`;
+        if (this.credentials.origin) proxyUrl += `&origin=${encodeURIComponent(this.credentials.origin)}`;
+      }
+      return proxyUrl;
+    }
     return streamTarget;
   }
 }

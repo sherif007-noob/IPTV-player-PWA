@@ -846,7 +846,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 msg = 'The video stream encountered a decoding error. Try switching format.';
                 break;
               case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-                msg = 'The stream source container or codec is not supported by the player.';
+                // Auto-fallback from MKV to MP4 since many browsers drop MKV support
+                if (activeUrl.includes('.mkv')) {
+                  console.warn('MKV playback failed, auto-switching to MP4 container fallback...');
+                  switchContainerExtension('mp4');
+                  return;
+                }
+                if (item.type === 'vod' || item.type === 'series') {
+                  msg = 'The stream container or codec is not supported by your browser (often MKV or HEVC/AC3 codecs). Try opening this stream in an external player like VLC.';
+                } else {
+                  msg = 'The stream source container or codec is not supported by the player.';
+                }
                 break;
             }
           }
@@ -980,6 +990,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <span>Retry Stream</span>
               </button>
             </div>
+
+            {/* Open in VLC Button */}
+            {(item.type === 'vod' || item.type === 'series') && (
+              <a
+                href={"vlc://" + xtreamService.getDirectStreamTarget(item.type, item.type === 'series' && seriesContext ? seriesContext.episode.id : item.id, activeUrl.includes('.mp4') ? 'mp4' : 'mkv')}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs tv-focus transition-all shadow-lg shadow-orange-500/25 mt-2"
+              >
+                <span>Open in VLC Player</span>
+              </a>
+            )}
 
             {/* Container extension switcher (MKV <-> MP4) */}
             {(item.type === 'vod' || item.type === 'series') && (

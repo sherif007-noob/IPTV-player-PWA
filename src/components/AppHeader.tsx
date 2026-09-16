@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { MainNavView, TvFontSize } from '../types';
 import { FONT_NAMES } from '../hooks/useStorage';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface AppHeaderProps {
   currentView: MainNavView | 'home';
@@ -169,8 +170,10 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right Controls: Refresh, Font Size Dropdown, Settings, HW Decode Badge */}
+      {/* Right Controls: Refresh, Font Size Dropdown, Settings, PWA Install, HW Decode Badge */}
       <div className="flex items-center gap-2 shrink-0">
+        <PWAInstallButton variant="header" />
+
         {/* Refresh Content Button */}
         <button
           id="btn-header-refresh"

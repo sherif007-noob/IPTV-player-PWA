@@ -20,6 +20,9 @@ export interface XtreamCredentials {
   autoRefreshHours: number;
   lastRefreshed?: number;
   rememberMe: boolean;
+  userAgent?: string;
+  referer?: string;
+  origin?: string;
 }
 
 export interface XtreamUserInfo {
