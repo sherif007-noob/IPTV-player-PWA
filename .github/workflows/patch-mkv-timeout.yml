@@ -1,0 +1,23 @@
+name: Patch MKV Fetch Timeout
+on:
+  push:
+    paths:
+      - scripts/patch-remove-mkv-fetch-timeout.mjs
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/patch-remove-mkv-fetch-timeout.mjs
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts
+          git commit -m "fix: allow long MKV streams to continue past 30 seconds"
+          git push
