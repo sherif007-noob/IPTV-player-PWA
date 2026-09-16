@@ -20,10 +20,7 @@ async function startServer() {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, HEAD, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "*");
-    res.setHeader(
-      "Access-Control-Expose-Headers",
-      "Content-Length, Content-Range, Accept-Ranges, Content-Type, X-Stream-Error, ETag"
-    );
+    res.setHeader("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges, Content-Type, X-Stream-Error, ETag");
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
   });
@@ -36,10 +33,7 @@ async function startServer() {
     return req.socket.remoteAddress || "";
   }
 
-  function getUpstreamHeaders(
-    req: express.Request,
-    extraHeaders: Record<string, string> = {}
-  ): Record<string, string> {
+  function getUpstreamHeaders(req: express.Request, extraHeaders: Record<string, string> = {}): Record<string, string> {
     const q_ua = req.query.ua as string;
     const q_referer = req.query.referer as string;
     const q_origin = req.query.origin as string;
@@ -48,51 +42,30 @@ async function startServer() {
       "Accept-Encoding": "identity",
       ...extraHeaders,
     };
-
     if (q_ua || PROVIDER_USER_AGENT) headers["User-Agent"] = q_ua || PROVIDER_USER_AGENT;
     if (q_referer || PROVIDER_REFERER) headers.Referer = q_referer || PROVIDER_REFERER;
     if (q_origin || PROVIDER_ORIGIN) headers.Origin = q_origin || PROVIDER_ORIGIN;
 
-    // Preserve the existing IPTV-provider compatibility behavior.
     const clientIp = getClientIp(req);
     if (clientIp) {
       headers["X-Forwarded-For"] = clientIp;
       headers["X-Real-IP"] = clientIp;
       headers["Client-IP"] = clientIp;
     }
-
     return headers;
   }
 
   function validateProxyUrl(urlStr: string): { valid: boolean; error?: string; parsed?: URL } {
-    if (!urlStr || typeof urlStr !== "string") {
-      return { valid: false, error: "Missing or invalid URL parameter" };
-    }
+    if (!urlStr || typeof urlStr !== "string") return { valid: false, error: "Missing or invalid URL parameter" };
     let parsed: URL;
-    try {
-      parsed = new URL(urlStr);
-    } catch {
-      return { valid: false, error: "Malformed URL syntax" };
-    }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return { valid: false, error: "Only HTTP and HTTPS protocols are allowed" };
-    }
+    try { parsed = new URL(urlStr); } catch { return { valid: false, error: "Malformed URL syntax" }; }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return { valid: false, error: "Only HTTP and HTTPS protocols are allowed" };
     const hostname = parsed.hostname.toLowerCase();
-    const isPrivateOrLoopback =
-      hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" ||
-      hostname === "::1" || hostname === "169.254.169.254" || hostname.startsWith("10.") ||
-      hostname.startsWith("192.168.") || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
-      hostname.endsWith(".local") || hostname.endsWith(".internal");
-    if (isPrivateOrLoopback) {
-      return { valid: false, error: "Access to private or local network resources is forbidden" };
-    }
+    const isPrivateOrLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1" || hostname === "169.254.169.254" || hostname.startsWith("10.") || hostname.startsWith("192.168.") || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) || hostname.endsWith(".local") || hostname.endsWith(".internal");
+    if (isPrivateOrLoopback) return { valid: false, error: "Access to private or local network resources is forbidden" };
     if (ALLOWED_IPTV_HOSTS.length > 0) {
-      const isAllowed = ALLOWED_IPTV_HOSTS.some(
-        (allowed) => hostname === allowed || hostname.endsWith("." + allowed)
-      );
-      if (!isAllowed) {
-        return { valid: false, error: `Host '${hostname}' is not in the allowed IPTV providers list` };
-      }
+      const isAllowed = ALLOWED_IPTV_HOSTS.some((allowed) => hostname === allowed || hostname.endsWith("." + allowed));
+      if (!isAllowed) return { valid: false, error: `Host '${hostname}' is not in the allowed IPTV providers list` };
     }
     return { valid: true, parsed };
   }
@@ -112,25 +85,15 @@ async function startServer() {
     return manifestText.split(/\r?\n/).map((line) => {
       const trimmed = line.trim();
       if (!trimmed) return line;
-
       if (trimmed.startsWith("#EXT")) {
         return line.replace(/URI="([^"]+)"/g, (match, uri) => {
-          try {
-            const absolute = new URL(uri, manifestBaseUrl).toString();
-            return `URI="${proxyUrl(absolute, req)}"`;
-          } catch {
-            return match;
-          }
+          try { return `URI="${proxyUrl(new URL(uri, manifestBaseUrl).toString(), req)}"`; }
+          catch { return match; }
         });
       }
-
       if (!trimmed.startsWith("#")) {
-        try {
-          const absolute = new URL(trimmed, manifestBaseUrl).toString();
-          return proxyUrl(absolute, req);
-        } catch {
-          return line;
-        }
+        try { return proxyUrl(new URL(trimmed, manifestBaseUrl).toString(), req); }
+        catch { return line; }
       }
       return line;
     }).join("\n");
@@ -156,17 +119,11 @@ async function startServer() {
       const targetUrl = req.query.url as string;
       const validation = validateProxyUrl(targetUrl);
       if (!validation.valid) return res.status(400).json({ error: validation.error });
-
-      const response = await fetch(targetUrl, {
-        method: "GET",
-        headers: getUpstreamHeaders(req),
-        redirect: "follow",
-        signal: AbortSignal.timeout(120000),
-      });
+      const response = await fetch(targetUrl, { method: "GET", headers: getUpstreamHeaders(req), redirect: "follow", signal: AbortSignal.timeout(120000) });
       const safeContentType = cleanContentType(response.headers.get("content-type"), "application/json; charset=utf-8");
       res.writeHead(response.status, { "Content-Type": safeContentType });
       if (!response.body) return res.end();
-      // @ts-ignore Node's Readable.fromWeb is available in the runtime used by this app.
+      // @ts-ignore
       Readable.fromWeb(response.body).pipe(res);
     } catch (err: any) {
       console.error("Xtream proxy error:", err.message);
@@ -174,30 +131,20 @@ async function startServer() {
     }
   });
 
-  // Browser VOD/Series stream proxy. Handles Range requests and HLS recursively.
   app.all("/api/xtream/stream", async (req, res) => {
     if (req.method !== "GET" && req.method !== "HEAD") return res.status(405).send("Method Not Allowed");
-
     try {
       const streamUrl = req.query.url as string;
       const validation = validateProxyUrl(streamUrl);
       if (!validation.valid) return res.status(400).send(validation.error);
 
       const extraHeaders: Record<string, string> = {};
-      for (const name of ["range", "if-range", "if-none-match", "if-modified-since"]) {
-        const value = req.headers[name];
-        if (typeof value === "string" && value) {
-          extraHeaders[name.replace(/(^|-)([a-z])/g, (_, p, c) => c.toUpperCase())] = value;
-        }
-      }
+      if (typeof req.headers.range === "string") extraHeaders.Range = req.headers.range;
+      if (typeof req.headers["if-range"] === "string") extraHeaders["If-Range"] = req.headers["if-range"];
+      if (typeof req.headers["if-none-match"] === "string") extraHeaders["If-None-Match"] = req.headers["if-none-match"];
+      if (typeof req.headers["if-modified-since"] === "string") extraHeaders["If-Modified-Since"] = req.headers["if-modified-since"];
 
-      const upstream = await fetch(streamUrl, {
-        method: req.method,
-        headers: getUpstreamHeaders(req, extraHeaders),
-        redirect: "follow",
-        signal: AbortSignal.timeout(120000),
-      });
-
+      const upstream = await fetch(streamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
       if (!upstream.ok && upstream.status >= 400) {
         const errText = await upstream.text().catch(() => "");
         const safeError = (errText || upstream.statusText).replace(/[^\x20-\x7E]/g, " ").slice(0, 200);
@@ -216,42 +163,25 @@ async function startServer() {
 
       const safeContentType = cleanContentType(upstream.headers.get("content-type"), defaultType);
       const isPlaylist = isM3u8 || safeContentType.includes("mpegurl") || safeContentType.includes("application/x-mpegurl");
-
       if (isPlaylist && req.method === "GET") {
         const manifestText = await upstream.text();
-        const finalUrl = upstream.url || streamUrl;
-        const rewritten = rewriteM3u8Manifest(manifestText, finalUrl, req);
-        return res.writeHead(upstream.status, {
-          "Content-Type": "application/vnd.apple.mpegurl",
-          "Content-Length": Buffer.byteLength(rewritten, "utf8"),
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-        }).end(rewritten);
+        const rewritten = rewriteM3u8Manifest(manifestText, upstream.url || streamUrl, req);
+        res.writeHead(upstream.status, { "Content-Type": "application/vnd.apple.mpegurl", "Content-Length": Buffer.byteLength(rewritten, "utf8"), "Cache-Control": "no-cache, no-store, must-revalidate" });
+        return res.end(rewritten);
       }
 
-      const forwardHeaders: Record<string, string> = {
-        "Content-Type": safeContentType,
-        "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
-      };
+      const forwardHeaders: Record<string, string> = { "Content-Type": safeContentType, "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes" };
       for (const key of ["content-length", "content-range", "etag", "last-modified", "cache-control"]) {
         const value = upstream.headers.get(key);
         if (value) forwardHeaders[key] = value;
       }
-
       res.writeHead(upstream.status, forwardHeaders);
       if (req.method === "HEAD") return res.end();
       if (!upstream.body) return res.end();
-
-      // @ts-ignore Node's Readable.fromWeb is available in the runtime used by this app.
+      // @ts-ignore
       const readable = Readable.fromWeb(upstream.body);
-      req.on("close", () => {
-        if (!res.writableEnded) {
-          try { readable.destroy(); } catch {}
-        }
-      });
-      readable.on("error", (err: any) => {
-        console.warn("Stream pipe notice:", err.message);
-        if (!res.writableEnded) res.end();
-      });
+      req.on("close", () => { if (!res.writableEnded) { try { readable.destroy(); } catch {} } });
+      readable.on("error", (err: any) => { console.warn("Stream pipe notice:", err.message); if (!res.writableEnded) res.end(); });
       readable.pipe(res);
     } catch (err: any) {
       console.error("Proxy stream error:", err.stack || err);
@@ -260,13 +190,7 @@ async function startServer() {
   });
 
   app.get("/api/health", (req, res) => {
-    res.json({
-      status: "ok",
-      device: "webos-iptv-player",
-      upstreamUserAgent: PROVIDER_USER_AGENT,
-      customRefererSet: !!PROVIDER_REFERER,
-      customOriginSet: !!PROVIDER_ORIGIN,
-    });
+    res.json({ status: "ok", device: "webos-iptv-player", upstreamUserAgent: PROVIDER_USER_AGENT, customRefererSet: !!PROVIDER_REFERER, customOriginSet: !!PROVIDER_ORIGIN });
   });
 
   if (process.env.NODE_ENV !== "production") {
@@ -278,9 +202,7 @@ async function startServer() {
     app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT}`);
-  });
+  app.listen(PORT, "0.0.0.0", () => console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT}`));
 }
 
 startServer();
