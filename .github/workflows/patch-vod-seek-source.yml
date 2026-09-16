@@ -1,0 +1,27 @@
+name: Patch VOD seek source
+
+on:
+  push:
+    paths:
+      - scripts/patch-vod-seek-source.mjs
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply surgical seek patch
+        run: |
+          node scripts/patch-vod-seek-source.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/VideoPlayer.tsx
+          git commit -m "fix: explicitly reload VOD source after seek"
+          git rm scripts/patch-vod-seek-source.mjs .github/workflows/patch-vod-seek-source.yml
+          git commit --amend --no-edit
+          git push origin HEAD:main
