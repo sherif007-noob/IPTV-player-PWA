@@ -30,8 +30,9 @@ jobs:
 
       - name: Verify FFmpeg binary
         run: |
-          node -e "const ffmpeg = require('ffmpeg-static'); if (!ffmpeg) throw new Error('ffmpeg-static did not resolve'); console.log('FFmpeg:', ffmpeg)"
-          node "$(node -e "process.stdout.write(require('ffmpeg-static'))")" -version
+          FFMPEG_PATH="$(node -e "process.stdout.write(require('ffmpeg-static'))")"
+          test -x "$FFMPEG_PATH"
+          "$FFMPEG_PATH" -version
 
       - name: Test direct MKV URL seeking with HTTP Range
         run: node scripts/test-direct-mkv-seek.mjs
