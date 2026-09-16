@@ -636,6 +636,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setIsBuffering(true);
       setPlaybackError(null);
       setActiveUrl(nextUrl);
+
+    // Explicitly replace the media element source after React commits the state.
+    // The old FFmpeg response is not seekable, so the browser must issue a new
+    // request to the proxy URL containing start=<target>.
+    window.setTimeout(() => {
+      const currentVideo = videoRef.current;
+      if (!currentVideo || currentVideo !== video) return;
+      try {
+        currentVideo.src = nextUrl;
+        currentVideo.load();
+        if (!wasPaused) safePlay();
+      } catch {}
+    }, 0);
       setSourceRevision((value) => value + 1);
 
       setSeekFeedback((target > currentStart ? '+' : '-') + Math.abs(target - currentStart) + 's');
