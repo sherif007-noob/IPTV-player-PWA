@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>WebOS Xtream IPTV Player</title>
+    <meta name="description" content="High-performance LG TV webOS IPTV player supporting Xtream Code playlists, Live TV, 4K VOD, Series with episode tracking, and Magic Remote navigation." />
+    <meta property="og:title" content="WebOS Xtream IPTV Player" />
+    <meta property="og:description" content="High-performance LG TV webOS IPTV player supporting Xtream Code playlists, Live TV, 4K VOD, Series with episode tracking, and Magic Remote navigation." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('webos_tv_font_size') || 'huge';
+          document.documentElement.setAttribute('data-tv-font', saved);
+          var scales = { small: '100%', medium: '120%', large: '150%', huge: '180%', maximum: '210%' };
+          document.documentElement.style.fontSize = scales[saved] || '180%';
+        } catch(e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

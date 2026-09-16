@@ -1,0 +1,22 @@
+{
+  "id": "com.iptv.webos.player",
+  "version": "1.0.0",
+  "vendor": "Xtream IPTV",
+  "type": "web",
+  "main": "index.html",
+  "title": "WebOS Xtream IPTV Player",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "splashBackground": "#0b0e14",
+  "theme": "dark",
+  "resolution": "1920x1080",
+  "bgColor": "#0b0e14",
+  "transparent": false,
+  "requiredVersion": "4.0.0",
+  "supportGpu": true,
+  "handlesRelaunch": true,
+  "disableBackHistoryAPI": true,
+  "accessibility": {
+    "supportsAudioGuidance": false
+  }
+}
