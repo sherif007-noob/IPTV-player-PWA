@@ -77,15 +77,19 @@ async function startServer() {
     if (!ffmpegPath) return false;
     const upstreamHeaders = getUpstreamHeaders(req);
     const customHeaders = Object.entries(upstreamHeaders)
-      .filter(([key]) => key.toLowerCase() !== "user-agent" && key.toLowerCase() !== "referer")
+      .filter(([key]) => !["user-agent", "referer", "host"].includes(key.toLowerCase()))
       .map(([key, value]) => `${key}: ${value}`)
       .join("\r\n");
     const args = [
-      "-hide_banner", "-loglevel", "warning",
+      "-hide_banner", "-loglevel", "info",
+      "-nostdin",
       ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
       "-user_agent", upstreamHeaders["User-Agent"] || PROVIDER_USER_AGENT,
       ...(upstreamHeaders.Referer ? ["-referer", upstreamHeaders.Referer] : []),
       ...(customHeaders ? ["-headers", `${customHeaders}\r\n`] : []),
+      "-http_seekable", "1",
+      "-http_persistent", "0",
+      "-rw_timeout", "30000000",
       "-i", streamUrl,
       "-map", "0:v:0", "-map", "0:a:0?",
       "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency",
@@ -96,10 +100,13 @@ async function startServer() {
       "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
       "-flush_packets", "1", "-f", "mp4", "pipe:1",
     ];
+    console.log(`Starting direct MKV FFmpeg: start=${startSeconds}s url=${streamUrl}`);
     const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stderr = "";
     let shuttingDown = false;
+    let producedOutput = false;
     ffmpeg.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    ffmpeg.stdout.on("data", () => { producedOutput = true; });
     res.statusCode = 200;
     res.setHeader("Content-Type", "video/mp4");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -119,7 +126,10 @@ async function startServer() {
       if (!shuttingDown) console.warn("FFmpeg direct URL stdout error:", err.message);
     });
     ffmpeg.on("close", (code) => {
-      if (code !== 0 && !shuttingDown && stderr.trim()) console.warn("FFmpeg direct URL exited:", code, stderr.trim().slice(-1000));
+      if (code !== 0 && !shuttingDown) {
+        const detail = stderr.trim().slice(-3000) || "no FFmpeg diagnostic output";
+        console.warn(`FFmpeg direct URL exited with code ${code}; producedOutput=${producedOutput}; diagnostics:\n${detail}`);
+      }
       if (!res.writableEnded && !res.destroyed) res.end();
     });
     ffmpeg.stdout.pipe(res);
@@ -154,7 +164,6 @@ async function startServer() {
       if (mp4FallbackUrl) {
         const mp4Response = await fetch(mp4FallbackUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
         if (mp4Response.ok) {
-          const upstreamUrl = mp4Response.url || mp4FallbackUrl;
           const safeContentType = cleanContentType(mp4Response.headers.get("content-type"), "video/mp4");
           const forwardHeaders: Record<string, string> = { "Content-Type": safeContentType, "Accept-Ranges": mp4Response.headers.get("accept-ranges") || "bytes" };
           for (const key of ["content-length", "content-range", "etag", "last-modified", "cache-control"]) { const value = mp4Response.headers.get(key); if (value) forwardHeaders[key] = value; }
