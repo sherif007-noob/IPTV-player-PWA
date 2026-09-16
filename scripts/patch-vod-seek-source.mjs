@@ -8,3 +8,4 @@ if (!source.includes(needle)) throw new Error('Expected seek source assignment w
 const count = source.split(needle).length - 1;
 if (count !== 1) throw new Error(`Expected exactly one seek source assignment, found ${count}`);
 fs.writeFileSync(path, source.replace(needle, replacement));
+// Trigger the temporary workflow once; it removes this script and its workflow after applying the patch.
