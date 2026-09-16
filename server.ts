@@ -34,11 +34,7 @@ async function startServer() {
   }
 
   function getUpstreamHeaders(req: express.Request, extra: Record<string, string> = {}): Record<string, string> {
-    const headers: Record<string, string> = {
-      Accept: "*/*",
-      "Accept-Encoding": "identity",
-      ...extra,
-    };
+    const headers: Record<string, string> = { Accept: "*/*", "Accept-Encoding": "identity", ...extra };
     const ua = req.query.ua as string;
     const referer = req.query.referer as string;
     const origin = req.query.origin as string;
@@ -54,7 +50,7 @@ async function startServer() {
     return headers;
   }
 
-  function validateProxyUrl(urlStr: string): { valid: boolean; error?: string; parsed?: URL } {
+  function validateProxyUrl(urlStr: string): { valid: boolean; error?: string } {
     if (!urlStr || typeof urlStr !== "string") return { valid: false, error: "Missing or invalid URL parameter" };
     let parsed: URL;
     try { parsed = new URL(urlStr); } catch { return { valid: false, error: "Malformed URL syntax" }; }
@@ -62,10 +58,8 @@ async function startServer() {
     const hostname = parsed.hostname.toLowerCase();
     const privateHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "0.0.0.0" || hostname === "::1" || hostname === "169.254.169.254" || hostname.startsWith("10.") || hostname.startsWith("192.168.") || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) || hostname.endsWith(".local") || hostname.endsWith(".internal");
     if (privateHost) return { valid: false, error: "Access to private or local network resources is forbidden" };
-    if (ALLOWED_IPTV_HOSTS.length && !ALLOWED_IPTV_HOSTS.some((allowed) => hostname === allowed || hostname.endsWith("." + allowed))) {
-      return { valid: false, error: `Host '${hostname}' is not in the allowed IPTV providers list` };
-    }
-    return { valid: true, parsed };
+    if (ALLOWED_IPTV_HOSTS.length && !ALLOWED_IPTV_HOSTS.some((allowed) => hostname === allowed || hostname.endsWith("." + allowed))) return { valid: false, error: `Host '${hostname}' is not in the allowed IPTV providers list` };
+    return { valid: true };
   }
 
   function proxyUrl(url: string, req: express.Request): string {
@@ -120,25 +114,21 @@ async function startServer() {
   async function transcodeMkvToMp4(upstream: Response, res: express.Response, startSeconds = 0): Promise<boolean> {
     if (!ffmpegPath || !upstream.body) return false;
 
-    const ffmpegArgs = [
-      "-hide_banner",
-      "-loglevel", "warning",
-      ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
+    // Input is a network pipe, so -ss must be AFTER -i. FFmpeg decodes/discards
+    // from the beginning until the requested timestamp, which is slower but reliable.
+    const args = [
+      "-hide_banner", "-loglevel", "warning",
       "-i", "pipe:0",
-      "-map", "0:v:0",
-      "-map", "0:a:0?",
-      "-c:v", "libx264",
-      "-preset", "veryfast",
-      "-pix_fmt", "yuv420p",
-      "-c:a", "aac",
-      "-b:a", "128k",
+      ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
+      "-map", "0:v:0", "-map", "0:a:0?",
+      "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", "128k",
       "-avoid_negative_ts", "make_zero",
       "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
-      "-f", "mp4",
-      "pipe:1",
+      "-f", "mp4", "pipe:1",
     ];
 
-    const ffmpeg = spawn(ffmpegPath, ffmpegArgs, { stdio: ["pipe", "pipe", "pipe"] });
+    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "pipe", "pipe"] });
     let stderr = "";
     ffmpeg.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
 
@@ -151,27 +141,18 @@ async function startServer() {
 
     const input = Readable.fromWeb(upstream.body as any);
     input.on("error", (err) => ffmpeg.stdin.destroy(err));
-    ffmpeg.on("error", (err) => {
-      console.warn("FFmpeg spawn error:", err.message);
-      if (!res.writableEnded) res.end();
-    });
+    ffmpeg.on("error", (err) => { console.warn("FFmpeg spawn error:", err.message); if (!res.writableEnded) res.end(); });
     ffmpeg.on("close", (code) => {
       if (code !== 0 && stderr.trim()) console.warn("FFmpeg exited:", code, stderr.trim().slice(-1000));
       if (!res.writableEnded) res.end();
     });
-
-    reqPipe(input, ffmpeg.stdin);
+    input.pipe(ffmpeg.stdin);
     ffmpeg.stdout.pipe(res);
-
     res.on("close", () => {
       if (!ffmpeg.killed) ffmpeg.kill("SIGKILL");
       try { input.destroy(); } catch {}
     });
     return true;
-  }
-
-  function reqPipe(input: Readable, output: NodeJS.WritableStream) {
-    input.pipe(output as any);
   }
 
   app.get("/api/xtream/proxy", async (req, res) => {
@@ -180,8 +161,7 @@ async function startServer() {
       const validation = validateProxyUrl(targetUrl);
       if (!validation.valid) return res.status(400).json({ error: validation.error });
       const response = await fetch(targetUrl, { method: "GET", headers: getUpstreamHeaders(req), redirect: "follow", signal: AbortSignal.timeout(120000) });
-      const safeContentType = cleanContentType(response.headers.get("content-type"), "application/json; charset=utf-8");
-      res.writeHead(response.status, { "Content-Type": safeContentType });
+      res.writeHead(response.status, { "Content-Type": cleanContentType(response.headers.get("content-type"), "application/json; charset=utf-8") });
       if (!response.body) return res.end();
       Readable.fromWeb(response.body as any).pipe(res);
     } catch (err: any) {
@@ -200,9 +180,7 @@ async function startServer() {
       const isMkv = (() => { try { return /\.mkv$/i.test(new URL(streamUrl).pathname); } catch { return false; } })();
       const requestedStart = Number(req.query.start);
       const startSeconds = isMkv && Number.isFinite(requestedStart) ? Math.max(0, requestedStart) : 0;
-
       const extraHeaders: Record<string, string> = {};
-      // A transcoded stream is not byte-range seekable; seeking is implemented by restarting FFmpeg at startSeconds.
       if (!isMkv && typeof req.headers.range === "string") extraHeaders.Range = req.headers.range;
       if (typeof req.headers["if-range"] === "string") extraHeaders["If-Range"] = req.headers["if-range"];
       if (typeof req.headers["if-none-match"] === "string") extraHeaders["If-None-Match"] = req.headers["if-none-match"];
@@ -211,13 +189,11 @@ async function startServer() {
       const mp4FallbackUrl = getMp4FallbackUrl(streamUrl);
       let upstreamUrl = mp4FallbackUrl || streamUrl;
       let upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
-
       if (mp4FallbackUrl && !upstream.ok) {
         console.log(`MP4 variant unavailable (${upstream.status}); falling back to MKV: ${streamUrl}`);
         upstreamUrl = streamUrl;
         upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
       }
-
       if (!upstream.ok && upstream.status >= 400) {
         const errText = await upstream.text().catch(() => "");
         const safeError = (errText || upstream.statusText).replace(/[^\x20-\x7E]/g, " ").slice(0, 200);
@@ -225,8 +201,8 @@ async function startServer() {
         return res.status(upstream.status).send(`Upstream stream error: ${upstream.status} - ${safeError}`);
       }
 
-      const cleanLowerUrl = upstreamUrl.toLowerCase();
-      const isM3u8 = cleanLowerUrl.includes(".m3u8") || cleanLowerUrl.includes("type=m3u_plus");
+      const lowerUrl = upstreamUrl.toLowerCase();
+      const isM3u8 = lowerUrl.includes(".m3u8") || lowerUrl.includes("type=m3u_plus");
       if (isMkv && req.method === "GET") {
         const transcoded = await transcodeMkvToMp4(upstream, res, startSeconds);
         if (transcoded) return;
@@ -234,10 +210,10 @@ async function startServer() {
 
       let defaultType = "video/mp4";
       if (isM3u8) defaultType = "application/vnd.apple.mpegurl";
-      else if (cleanLowerUrl.includes(".ts")) defaultType = "video/mp2t";
-      else if (cleanLowerUrl.includes(".mkv")) defaultType = "video/x-matroska";
-      else if (cleanLowerUrl.includes(".webm")) defaultType = "video/webm";
-      else if (cleanLowerUrl.includes(".mov")) defaultType = "video/quicktime";
+      else if (lowerUrl.includes(".ts")) defaultType = "video/mp2t";
+      else if (lowerUrl.includes(".mkv")) defaultType = "video/x-matroska";
+      else if (lowerUrl.includes(".webm")) defaultType = "video/webm";
+      else if (lowerUrl.includes(".mov")) defaultType = "video/quicktime";
 
       const safeContentType = cleanContentType(upstream.headers.get("content-type"), defaultType);
       const isPlaylist = isM3u8 || safeContentType.includes("mpegurl") || safeContentType.includes("application/x-mpegurl");
@@ -248,10 +224,7 @@ async function startServer() {
         return res.end(rewritten);
       }
 
-      const forwardHeaders: Record<string, string> = {
-        "Content-Type": safeContentType,
-        "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
-      };
+      const forwardHeaders: Record<string, string> = { "Content-Type": safeContentType, "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes" };
       for (const key of ["content-length", "content-range", "etag", "last-modified", "cache-control"]) {
         const value = upstream.headers.get(key);
         if (value) forwardHeaders[key] = value;
