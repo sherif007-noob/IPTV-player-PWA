@@ -155,16 +155,15 @@ async function startServer() {
       if (typeof req.headers["if-none-match"] === "string") extraHeaders["If-None-Match"] = req.headers["if-none-match"];
       if (typeof req.headers["if-modified-since"] === "string") extraHeaders["If-Modified-Since"] = req.headers["if-modified-since"];
 
-      // Browsers generally cannot decode MKV. Xtream providers commonly expose the
-      // same VOD/episode through both .mkv and .mp4 URLs, so transparently try the
-      // MP4 endpoint first while preserving the original request/range headers.
+      // Browser fallback: request the provider's MP4 variant first for MKV VOD/series.
+      // If the provider does not expose an MP4 variant, transparently fall back to MKV.
       const mp4FallbackUrl = getMp4FallbackUrl(streamUrl);
-      let upstreamUrl = streamUrl;
+      let upstreamUrl = mp4FallbackUrl || streamUrl;
       let upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
 
       if (mp4FallbackUrl && !upstream.ok) {
-        console.log(`MKV upstream failed (${upstream.status}); trying MP4 fallback: ${mp4FallbackUrl}`);
-        upstreamUrl = mp4FallbackUrl;
+        console.log(`MP4 variant unavailable (${upstream.status}); falling back to MKV: ${streamUrl}`);
+        upstreamUrl = streamUrl;
         upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
       }
 
