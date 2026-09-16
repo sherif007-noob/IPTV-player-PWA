@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   patch:
-    if: "${{ !contains(github.event.head_commit.message, '[mkv-fetch-patched]') }}"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,9 +16,16 @@ jobs:
 
       - name: Patch MKV transcoder
         shell: python
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           from pathlib import Path
           import re
+          import os
+
+          if '[mkv-fetch-patched]' in os.environ.get('COMMIT_MESSAGE', ''):
+              print('Patch already applied; nothing to do.')
+              raise SystemExit(0)
 
           path = Path('server.ts')
           text = path.read_text()
@@ -115,10 +121,17 @@ jobs:
           path.write_text(patched)
 
       - name: Commit patched server
+        shell: bash
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
+          if [[ "$COMMIT_MESSAGE" == *"[mkv-fetch-patched]"* ]]; then
+            echo "Patch commit already applied; skipping commit."
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server.ts
-          git diff --cached --quiet && exit 0
+          git diff --cached --quiet && { echo "No server.ts changes needed."; exit 0; }
           git commit -m "fix: fetch MKV upstream before FFmpeg [mkv-fetch-patched]"
           git push
