@@ -114,6 +114,17 @@ async function startServer() {
     return mimeMatch ? mimeMatch[1] : fallback;
   }
 
+  function getMp4FallbackUrl(urlStr: string): string | null {
+    try {
+      const parsed = new URL(urlStr);
+      if (!/\.mkv$/i.test(parsed.pathname)) return null;
+      parsed.pathname = parsed.pathname.replace(/\.mkv$/i, ".mp4");
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  }
+
   app.get("/api/xtream/proxy", async (req, res) => {
     try {
       const targetUrl = req.query.url as string;
@@ -144,7 +155,19 @@ async function startServer() {
       if (typeof req.headers["if-none-match"] === "string") extraHeaders["If-None-Match"] = req.headers["if-none-match"];
       if (typeof req.headers["if-modified-since"] === "string") extraHeaders["If-Modified-Since"] = req.headers["if-modified-since"];
 
-      const upstream = await fetch(streamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
+      // Browsers generally cannot decode MKV. Xtream providers commonly expose the
+      // same VOD/episode through both .mkv and .mp4 URLs, so transparently try the
+      // MP4 endpoint first while preserving the original request/range headers.
+      const mp4FallbackUrl = getMp4FallbackUrl(streamUrl);
+      let upstreamUrl = streamUrl;
+      let upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
+
+      if (mp4FallbackUrl && !upstream.ok) {
+        console.log(`MKV upstream failed (${upstream.status}); trying MP4 fallback: ${mp4FallbackUrl}`);
+        upstreamUrl = mp4FallbackUrl;
+        upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
+      }
+
       if (!upstream.ok && upstream.status >= 400) {
         const errText = await upstream.text().catch(() => "");
         const safeError = (errText || upstream.statusText).replace(/[^\x20-\x7E]/g, " ").slice(0, 200);
@@ -152,7 +175,7 @@ async function startServer() {
         return res.status(upstream.status).send(`Upstream stream error: ${upstream.status} - ${safeError}`);
       }
 
-      const cleanLowerUrl = streamUrl.toLowerCase();
+      const cleanLowerUrl = upstreamUrl.toLowerCase();
       const isM3u8 = cleanLowerUrl.includes(".m3u8") || cleanLowerUrl.includes("type=m3u_plus");
       let defaultType = "video/mp4";
       if (isM3u8) defaultType = "application/vnd.apple.mpegurl";
@@ -165,7 +188,7 @@ async function startServer() {
       const isPlaylist = isM3u8 || safeContentType.includes("mpegurl") || safeContentType.includes("application/x-mpegurl");
       if (isPlaylist && req.method === "GET") {
         const manifestText = await upstream.text();
-        const rewritten = rewriteM3u8Manifest(manifestText, upstream.url || streamUrl, req);
+        const rewritten = rewriteM3u8Manifest(manifestText, upstream.url || upstreamUrl, req);
         res.writeHead(upstream.status, { "Content-Type": "application/vnd.apple.mpegurl", "Content-Length": Buffer.byteLength(rewritten, "utf8"), "Cache-Control": "no-cache, no-store, must-revalidate" });
         return res.end(rewritten);
       }
