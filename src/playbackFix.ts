@@ -1,5 +1,3 @@
-import type { } from 'react';
-
 const durationCache = new Map<string, number>();
 const durationPromises = new Map<string, Promise<number | null>>();
 const seekInProgress = new WeakSet<HTMLVideoElement>();
