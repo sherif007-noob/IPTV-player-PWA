@@ -88,16 +88,48 @@ async function startServer() {
       "-flush_packets", "1", "-f", "mp4", "pipe:1",
     ];
     const ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "pipe", "pipe"] });
-    let stderr = ""; ffmpeg.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
-    res.statusCode = 200; res.setHeader("Content-Type", "video/mp4");
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate"); res.setHeader("Accept-Ranges", "none");
-    res.setHeader("X-Stream-Transcoded", "mkv-to-mp4"); if (startSeconds > 0) res.setHeader("X-Stream-Start", String(startSeconds));
+    let stderr = "";
+    ffmpeg.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Accept-Ranges", "none");
+    res.setHeader("X-Stream-Transcoded", "mkv-to-mp4");
+    if (startSeconds > 0) res.setHeader("X-Stream-Start", String(startSeconds));
+
     const input = Readable.fromWeb(upstream.body as any);
-    input.on("error", (err) => ffmpeg.stdin.destroy(err));
-    ffmpeg.on("error", (err) => { console.warn("FFmpeg spawn error:", err.message); if (!res.writableEnded) res.end(); });
-    ffmpeg.on("close", (code) => { if (code !== 0 && stderr.trim()) console.warn("FFmpeg exited:", code, stderr.trim().slice(-1000)); if (!res.writableEnded) res.end(); });
-    input.pipe(ffmpeg.stdin); ffmpeg.stdout.pipe(res);
-    res.on("close", () => { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); try { input.destroy(); } catch {} });
+    let shuttingDown = false;
+    const stop = () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      try { input.destroy(); } catch {}
+      if (!ffmpeg.killed) ffmpeg.kill("SIGKILL");
+    };
+
+    // A client seeking/reloading closes the old response. Treat the resulting
+    // stream errors as normal cancellation rather than crashing Node.
+    input.on("error", (err) => {
+      if (!shuttingDown) console.warn("Upstream stream input error:", err.message);
+      try { ffmpeg.stdin.destroy(); } catch {}
+    });
+    ffmpeg.stdin.on("error", (err) => {
+      if (!shuttingDown && !res.destroyed) console.warn("FFmpeg stdin error:", err.message);
+    });
+    ffmpeg.on("error", (err) => {
+      if (!shuttingDown) console.warn("FFmpeg spawn error:", err.message);
+      if (!res.writableEnded && !res.destroyed) res.end();
+    });
+    ffmpeg.on("close", (code) => {
+      if (code !== 0 && !shuttingDown && stderr.trim()) console.warn("FFmpeg exited:", code, stderr.trim().slice(-1000));
+      if (!res.writableEnded && !res.destroyed) res.end();
+    });
+    input.pipe(ffmpeg.stdin);
+    ffmpeg.stdout.on("error", (err) => {
+      if (!shuttingDown) console.warn("FFmpeg stdout error:", err.message);
+    });
+    ffmpeg.stdout.pipe(res);
+    res.on("close", stop);
+    res.on("error", () => stop());
     return true;
   }
 
@@ -124,8 +156,9 @@ async function startServer() {
       if (typeof req.headers["if-none-match"] === "string") extraHeaders["If-None-Match"] = req.headers["if-none-match"];
       if (typeof req.headers["if-modified-since"] === "string") extraHeaders["If-Modified-Since"] = req.headers["if-modified-since"];
       const mp4FallbackUrl = getMp4FallbackUrl(streamUrl); let upstreamUrl = mp4FallbackUrl || streamUrl;
-      let upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) });
-      if (mp4FallbackUrl && !upstream.ok) { console.log(`MP4 variant unavailable (${upstream.status}); falling back to MKV: ${streamUrl}`); upstreamUrl = streamUrl; upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000) }); }
+      const fetchTimeoutMs = isMkv && startSeconds > 0 ? 10 * 60 * 1000 : 120000;
+      let upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(fetchTimeoutMs) });
+      if (mp4FallbackUrl && !upstream.ok) { console.log(`MP4 variant unavailable (${upstream.status}); falling back to MKV: ${streamUrl}`); upstreamUrl = streamUrl; upstream = await fetch(upstreamUrl, { method: req.method, headers: getUpstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(fetchTimeoutMs) }); }
       if (!upstream.ok && upstream.status >= 400) { const errText = await upstream.text().catch(() => ""); const safeError = (errText || upstream.statusText).replace(/[^\x20-\x7E]/g, " ").slice(0, 200); res.setHeader("X-Stream-Error", safeError); return res.status(upstream.status).send(`Upstream stream error: ${upstream.status} - ${safeError}`); }
       const lowerUrl = upstreamUrl.toLowerCase(); const isM3u8 = lowerUrl.includes(".m3u8") || lowerUrl.includes("type=m3u_plus");
       if (isMkv && req.method === "GET") { const transcoded = await transcodeMkvToMp4(upstream, res, startSeconds); if (transcoded) return; }
