@@ -1,0 +1,216 @@
+name: Apply MKV fetch test patch
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[mkv-fetch-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch MKV transcoder
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('server.ts')
+          text = path.read_text()
+
+          replacement = r'''  async function transcodeMkvUrlToMp4(streamUrl: string, req: express.Request, res: express.Response, startSeconds = 0): Promise<boolean> {
+    if (!ffmpegPath) return false;
+
+    const upstreamHeaders = getUpstreamHeaders(req);
+    const ffmpegHeaders = Object.entries(upstreamHeaders)
+      .filter(([key]) => !["user-agent", "referer", "host", "x-forwarded-for", "x-real-ip", "client-ip"].includes(key.toLowerCase()))
+      .map(([key, value]) => `${key}: ${value}`)
+      .join("\\r\\n");
+
+    // For normal playback, fetch the provider stream with Node first and feed the
+    // verified response body to FFmpeg. This gives us the real upstream status,
+    // headers and body instead of hiding provider failures inside FFmpeg's HTTP client.
+    // Keep the direct URL path for seeks because a pipe cannot seek by timestamp.
+    if (startSeconds > 0) {
+      const args = [
+        "-hide_banner", "-loglevel", "info", "-nostdin",
+        "-ss", String(startSeconds),
+        "-user_agent", upstreamHeaders["User-Agent"] || PROVIDER_USER_AGENT,
+        ...(upstreamHeaders.Referer ? ["-referer", upstreamHeaders.Referer] : []),
+        ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\\r\\n`] : []),
+        "-http_seekable", "1", "-http_persistent", "0", "-rw_timeout", "30000000",
+        "-i", streamUrl,
+        "-map", "0:v:0", "-map", "0:a:0?",
+        "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency",
+        "-profile:v", "main", "-pix_fmt", "yuv420p", "-bf", "0", "-refs", "1",
+        "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+        "-avoid_negative_ts", "make_zero",
+        "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
+        "-flush_packets", "1", "-f", "mp4", "pipe:1",
+      ];
+      console.log(`Starting direct MKV FFmpeg seek: start=${startSeconds}s url=${streamUrl}`);
+      return startFfmpeg(args, res, startSeconds);
+    }
+
+    let upstream: Response;
+    try {
+      console.log(`Fetching MKV upstream before FFmpeg: ${streamUrl}`);
+      upstream = await fetch(streamUrl, {
+        method: "GET",
+        headers: upstreamHeaders,
+        redirect: "follow",
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch (err: any) {
+      console.warn(`MKV upstream fetch failed: ${err?.message || err}`);
+      if (!res.headersSent) res.status(502).send(`Upstream MKV connection failed: ${err?.message || "connection failed"}`);
+      return true;
+    }
+
+    const contentType = upstream.headers.get("content-type") || "unknown";
+    const contentLength = upstream.headers.get("content-length") || "unknown";
+    console.log(`MKV upstream response: status=${upstream.status} type=${contentType} length=${contentLength} finalUrl=${upstream.url || streamUrl}`);
+
+    if (!upstream.ok || !upstream.body) {
+      const errorBody = await upstream.text().catch(() => "");
+      const safeError = (errorBody || upstream.statusText || "empty upstream response").replace(/[^\\x20-\\x7E]/g, " ").slice(0, 500);
+      console.warn(`MKV upstream rejected before FFmpeg: HTTP ${upstream.status} ${safeError}`);
+      if (!res.headersSent) res.status(upstream.status || 502).send(`Upstream MKV error: ${upstream.status} - ${safeError}`);
+      return true;
+    }
+
+    const args = [
+      "-hide_banner", "-loglevel", "info", "-nostdin",
+      "-i", "pipe:0",
+      "-map", "0:v:0", "-map", "0:a:0?",
+      "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency",
+      "-profile:v", "main", "-pix_fmt", "yuv420p", "-bf", "0", "-refs", "1",
+      "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
+      "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+      "-avoid_negative_ts", "make_zero",
+      "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
+      "-flush_packets", "1", "-f", "mp4", "pipe:1",
+    ];
+
+    console.log("Starting FFmpeg from verified MKV response body");
+    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "pipe", "pipe"] });
+    let stderr = "";
+    let producedOutput = false;
+    let shuttingDown = false;
+    let firstOutputTimer: NodeJS.Timeout | null = null;
+
+    const stop = () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      if (firstOutputTimer) clearTimeout(firstOutputTimer);
+      try { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); } catch {}
+    };
+
+    ffmpeg.stderr.on("data", (chunk) => {
+      const text = chunk.toString();
+      stderr += text;
+      console.log(`FFmpeg MKV: ${text.trimEnd()}`);
+    });
+
+    ffmpeg.stdout.on("data", () => {
+      if (!producedOutput) {
+        producedOutput = true;
+        if (firstOutputTimer) clearTimeout(firstOutputTimer);
+        console.log("FFmpeg MKV produced first MP4 output bytes");
+      }
+    });
+
+    ffmpeg.on("error", (err) => {
+      if (!shuttingDown) console.warn("FFmpeg MKV spawn error:", err.message);
+      if (!res.writableEnded && !res.destroyed) res.end();
+    });
+
+    ffmpeg.stdin.on("error", (err) => {
+      if (!shuttingDown) console.warn("FFmpeg MKV stdin error:", err.message);
+    });
+
+    ffmpeg.stdout.on("error", (err) => {
+      if (!shuttingDown) console.warn("FFmpeg MKV stdout error:", err.message);
+    });
+
+    ffmpeg.on("close", (code) => {
+      if (firstOutputTimer) clearTimeout(firstOutputTimer);
+      if (code !== 0 && !shuttingDown) {
+        console.warn(`FFmpeg MKV exited with code ${code}; producedOutput=${producedOutput}; diagnostics:\\n${stderr.trim().slice(-4000) || "none"}`);
+      } else {
+        console.log(`FFmpeg MKV exited with code ${code}; producedOutput=${producedOutput}`);
+      }
+      if (!res.writableEnded && !res.destroyed) res.end();
+    });
+
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Accept-Ranges", "none");
+    res.setHeader("X-Stream-Transcoded", "mkv-to-mp4-node-fetch");
+    if (startSeconds > 0) res.setHeader("X-Stream-Start", String(startSeconds));
+
+    firstOutputTimer = setTimeout(() => {
+      if (!producedOutput && !shuttingDown) {
+        console.warn(`FFmpeg MKV produced no output within 30000ms; diagnostics:\\n${stderr.trim().slice(-4000) || "none"}`);
+        stop();
+        if (!res.writableEnded && !res.destroyed) res.end();
+      }
+    }, 30000);
+
+    Readable.fromWeb(upstream.body as any).on("error", (err: any) => {
+      if (!shuttingDown) console.warn("MKV upstream body error:", err.message);
+      try { ffmpeg.stdin.destroy(err); } catch {}
+    }).pipe(ffmpeg.stdin);
+
+    ffmpeg.stdout.pipe(res);
+    res.on("close", stop);
+    res.on("error", stop);
+    return true;
+  }
+
+  function startFfmpeg(args: string[], res: express.Response, startSeconds: number): boolean {
+    if (!ffmpegPath) return false;
+    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stderr = "";
+    let producedOutput = false;
+    let shuttingDown = false;
+    ffmpeg.stderr.on("data", (chunk) => { const text = chunk.toString(); stderr += text; console.log(`FFmpeg MKV seek: ${text.trimEnd()}`); });
+    ffmpeg.stdout.on("data", () => { if (!producedOutput) { producedOutput = true; console.log("FFmpeg MKV seek produced first MP4 output bytes"); } });
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Accept-Ranges", "none");
+    res.setHeader("X-Stream-Transcoded", "mkv-to-mp4-direct-url-seek");
+    res.setHeader("X-Stream-Start", String(startSeconds));
+    const stop = () => { if (shuttingDown) return; shuttingDown = true; if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); };
+    ffmpeg.on("error", (err) => { if (!shuttingDown) console.warn("FFmpeg MKV seek spawn error:", err.message); if (!res.writableEnded && !res.destroyed) res.end(); });
+    ffmpeg.on("close", (code) => { if (code !== 0 && !shuttingDown) console.warn(`FFmpeg MKV seek exited with code ${code}; producedOutput=${producedOutput}; diagnostics:\\n${stderr.trim().slice(-4000) || "none"}`); if (!res.writableEnded && !res.destroyed) res.end(); });
+    ffmpeg.stdout.pipe(res);
+    res.on("close", stop);
+    res.on("error", stop);
+    return true;
+  }
+'''
+
+          pattern = r'  function transcodeMkvUrlToMp4\([\s\S]*?\n  app\.get\("/api/xtream/proxy"'
+          patched, count = re.subn(pattern, replacement + '\n  app.get("/api/xtream/proxy"', text, count=1)
+          if count != 1:
+              raise SystemExit(f'Could not locate transcodeMkvUrlToMp4 block; matches={count}')
+          path.write_text(patched)
+
+      - name: Commit patched server
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: fetch MKV upstream before FFmpeg [mkv-fetch-patched]"
+          git push
