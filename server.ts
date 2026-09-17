@@ -29,7 +29,7 @@ async function startServer() {
     res.setHeader("Access-Control-Allow-Headers", "*");
     res.setHeader(
       "Access-Control-Expose-Headers",
-      "Content-Length, Content-Range, Accept-Ranges, Content-Type, X-Stream-Error, X-Stream-Start, X-Stream-Transcoded, X-Playback-Session, X-Playback-Id, ETag"
+      "Content-Length, Content-Range, Accept-Ranges, Content-Type, X-Playback-Session, X-Playback-Id, X-HLS-Mode, ETag"
     );
     if (req.method === "OPTIONS") return res.sendStatus(204);
     next();
@@ -43,8 +43,7 @@ async function startServer() {
     playback: cleanId(req.query.playback),
   });
 
-  const hlsDir = (session: string, playback: string) =>
-    path.join(HLS_ROOT, session, playback);
+  const hlsDir = (session: string, playback: string) => path.join(HLS_ROOT, session, playback);
 
   const removePathSoon = (target: string, delay = 800) => {
     setTimeout(() => {
@@ -57,13 +56,11 @@ async function startServer() {
     const current = active.get(session);
     if (!current) return false;
     if (playback && current.playback !== playback) {
-      console.log(
-        `Ignoring stale stop session=${session} playback=${playback}; active=${current.playback}`
-      );
+      console.log(`Ignoring stale stop session=${session} playback=${playback}; active=${current.playback}`);
       return false;
     }
     active.delete(session);
-    console.log(`Stopping transcode session=${session} playback=${current.playback}: ${reason}`);
+    console.log(`Stopping HLS session=${session} playback=${current.playback}: ${reason}`);
     try { current.stop(reason); } catch {}
     return true;
   };
@@ -72,7 +69,7 @@ async function startServer() {
     if (!session) return;
     stopActive(session, undefined, "superseded by new playback");
     active.set(session, { playback, stop });
-    console.log(`Registered transcode session=${session} playback=${playback || "none"}`);
+    console.log(`Registered HLS session=${session} playback=${playback}`);
   };
 
   const clearActive = (session: string, playback: string) => {
@@ -136,15 +133,6 @@ async function startServer() {
     return fallback;
   }
 
-  function mp4Fallback(urlString: string) {
-    try {
-      const parsed = new URL(urlString);
-      if (!/\.mkv$/i.test(parsed.pathname)) return null;
-      parsed.pathname = parsed.pathname.replace(/\.mkv$/i, ".mp4");
-      return parsed.toString();
-    } catch { return null; }
-  }
-
   function proxyUrl(url: string, req: express.Request) {
     const params = new URLSearchParams({ url });
     for (const key of ["ua", "referer", "origin"]) {
@@ -171,19 +159,22 @@ async function startServer() {
     }).join("\n");
   }
 
-  const commonVideoArgs = () => [
+  function isProviderHls(urlString: string) {
+    try {
+      const parsed = new URL(urlString);
+      return /\.m3u8$/i.test(parsed.pathname) || /(?:^|[?&])type=m3u_plus(?:&|$)/i.test(urlString);
+    } catch {
+      return false;
+    }
+  }
+
+  const hlsTranscodeArgs = () => [
     "-map", "0:v:0", "-map", "0:a:0?",
     "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency",
     "-profile:v", "main", "-level:v", "3.1", "-pix_fmt", "yuv420p",
     "-bf", "0", "-refs", "1", "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
     "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
     "-avoid_negative_ts", "make_zero",
-  ];
-
-  const mp4OutputArgs = () => [
-    ...commonVideoArgs(),
-    "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
-    "-flush_packets", "1", "-f", "mp4", "pipe:1",
   ];
 
   async function waitForPlaylist(file: string, timeoutMs = 25000) {
@@ -193,12 +184,12 @@ async function startServer() {
         const text = await fs.promises.readFile(file, "utf8");
         if (text.includes("#EXTINF:")) return text;
       } catch {}
-      await new Promise((resolve) => setTimeout(resolve, 120));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
     return "";
   }
 
-  async function startHlsTranscode(
+  async function startGeneratedHls(
     url: string,
     req: express.Request,
     session: string,
@@ -206,10 +197,9 @@ async function startServer() {
     start: number
   ) {
     if (!ffmpegPath) throw new Error("FFmpeg is unavailable");
-    const existing = active.get(session);
-    if (existing?.playback === playback) return;
+    if (active.get(session)?.playback === playback) return;
 
-    stopActive(session, undefined, "new HLS playback for same player session");
+    stopActive(session, undefined, "new playback for same player session");
     const sessionRoot = path.join(HLS_ROOT, session);
     await fs.promises.rm(sessionRoot, { recursive: true, force: true }).catch(() => {});
     const dir = hlsDir(session, playback);
@@ -231,19 +221,17 @@ async function startServer() {
       ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\r\n`] : []),
       "-rw_timeout", "120000000",
       "-i", url,
-      ...commonVideoArgs(),
+      ...hlsTranscodeArgs(),
       "-f", "hls",
-      "-hls_time", "4",
-      "-hls_list_size", "6",
-      "-hls_delete_threshold", "2",
+      "-hls_time", "2",
+      "-hls_list_size", "8",
+      "-hls_delete_threshold", "3",
       "-hls_flags", "delete_segments+independent_segments+temp_file",
       "-hls_segment_filename", segmentPattern,
       playlist,
     ];
 
-    console.log(
-      `Starting HLS MKV transcode session=${session} playback=${playback} start=${start}s inputUrl=${url}`
-    );
+    console.log(`Starting generated HLS session=${session} playback=${playback} start=${start}s inputUrl=${url}`);
     const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stopped = false;
     let stderr = "";
@@ -251,7 +239,7 @@ async function startServer() {
     const stop: StopFn = (reason) => {
       if (stopped) return;
       stopped = true;
-      console.log(`HLS FFmpeg stop session=${session} playback=${playback}: ${reason}`);
+      console.log(`Generated HLS stop session=${session} playback=${playback}: ${reason}`);
       try { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); } catch {}
       removePathSoon(dir);
     };
@@ -275,60 +263,6 @@ async function startServer() {
     });
   }
 
-  function transcodeHeaders(res: express.Response, start: number, session: string, playback: string) {
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "video/mp4");
-    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-    res.setHeader("Accept-Ranges", "none");
-    res.setHeader("X-Stream-Start", String(start));
-    res.setHeader("X-Stream-Transcoded", "mkv-to-fragmented-mp4-fallback");
-    if (session) res.setHeader("X-Playback-Session", session);
-    if (playback) res.setHeader("X-Playback-Id", playback);
-  }
-
-  async function transcodeMkvFallback(
-    url: string,
-    req: express.Request,
-    res: express.Response,
-    start: number,
-    session: string,
-    playback: string
-  ) {
-    if (!ffmpegPath) return false;
-    const headers = upstreamHeaders(req);
-    const ffmpegHeaders = Object.entries(headers)
-      .filter(([key]) => !["user-agent", "referer", "host"].includes(key.toLowerCase()))
-      .map(([key, value]) => `${key}: ${value}`)
-      .join("\r\n");
-    const args = [
-      "-hide_banner", "-loglevel", "info", "-nostdin",
-      ...(start > 0 ? ["-ss", String(start)] : []),
-      "-user_agent", headers["User-Agent"] || PROVIDER_USER_AGENT,
-      ...(headers.Referer ? ["-referer", headers.Referer] : []),
-      ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\r\n`] : []),
-      "-rw_timeout", "120000000", "-i", url,
-      ...mp4OutputArgs(),
-    ];
-    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stopped = false;
-    const stop: StopFn = (reason) => {
-      if (stopped) return;
-      stopped = true;
-      console.log(`Fallback FFmpeg stop session=${session || "none"} playback=${playback || "none"}: ${reason}`);
-      try { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); } catch {}
-      try { ffmpeg.stdout.destroy(); } catch {}
-      if (!res.writableEnded && !res.destroyed) try { res.end(); } catch {}
-    };
-    register(session, playback, stop);
-    transcodeHeaders(res, start, session, playback);
-    ffmpeg.stderr.on("data", (chunk) => console.log(`FFmpeg MKV fallback: ${chunk.toString().trimEnd()}`));
-    ffmpeg.on("close", () => clearActive(session, playback));
-    ffmpeg.stdout.pipe(res);
-    res.on("close", () => { clearActive(session, playback); stop("client response closed"); });
-    res.on("error", () => { clearActive(session, playback); stop("client response error"); });
-    return true;
-  }
-
   app.get("/api/xtream/hls/:session/:playback/index.m3u8", async (req, res) => {
     try {
       const session = cleanId(req.params.session);
@@ -336,10 +270,27 @@ async function startServer() {
       if (!session || !playback || session !== req.params.session || playback !== req.params.playback) {
         return res.status(400).send("Invalid playback identity");
       }
+
       const url = String(req.query.url || "");
       const error = validate(url);
       if (error) return res.status(400).send(error);
-      if (!/\.mkv$/i.test(new URL(url).pathname)) return res.status(400).send("HLS transcoding requires an MKV source");
+
+      if (isProviderHls(url)) {
+        const upstream = await fetch(url, {
+          headers: upstreamHeaders(req),
+          redirect: "follow",
+          signal: AbortSignal.timeout(120000),
+        });
+        if (!upstream.ok) return res.status(upstream.status).send(`Upstream HLS error: ${upstream.status}`);
+        const body = rewriteM3u8(await upstream.text(), upstream.url || url, req);
+        res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        res.setHeader("X-HLS-Mode", "provider-passthrough");
+        res.setHeader("X-Playback-Session", session);
+        res.setHeader("X-Playback-Id", playback);
+        return res.send(body);
+      }
+
       const requestedStart = Number(req.query.start);
       const start = Number.isFinite(requestedStart) ? Math.max(0, requestedStart) : 0;
       const playlist = path.join(hlsDir(session, playback), "index.m3u8");
@@ -347,7 +298,7 @@ async function startServer() {
       let text = "";
       try { text = await fs.promises.readFile(playlist, "utf8"); } catch {}
       if (!text.includes("#EXTINF:")) {
-        await startHlsTranscode(url, req, session, playback, start);
+        await startGeneratedHls(url, req, session, playback, start);
         text = await waitForPlaylist(playlist);
       }
       if (!text) {
@@ -355,12 +306,13 @@ async function startServer() {
         return res.status(504).send("Timed out waiting for the first HLS segment");
       }
 
-      console.log(`Serving HLS manifest session=${session} playback=${playback} start=${start}s`);
+      console.log(`Serving generated HLS manifest session=${session} playback=${playback} start=${start}s`);
       res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("X-HLS-Mode", "generated");
       res.setHeader("X-Playback-Session", session);
       res.setHeader("X-Playback-Id", playback);
-      res.send(text);
+      return res.send(text);
     } catch (error: any) {
       console.error("HLS manifest error:", error.stack || error);
       if (!res.headersSent) res.status(500).send(error.message || "HLS manifest error");
@@ -380,7 +332,7 @@ async function startServer() {
     catch { return res.status(404).end(); }
     res.setHeader("Content-Type", "video/mp2t");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-    res.sendFile(file);
+    return res.sendFile(file);
   });
 
   app.post("/api/xtream/stop", (req, res) => {
@@ -388,7 +340,7 @@ async function startServer() {
     if (!session) return res.status(400).json({ error: "Missing session" });
     const stopped = stopActive(session, playback || undefined, "explicit player stop");
     if (!stopped && playback) removePathSoon(hlsDir(session, playback), 0);
-    res.json({ stopped, session, playback: playback || null });
+    return res.json({ stopped, session, playback: playback || null });
   });
 
   app.get("/api/xtream/proxy", async (req, res) => {
@@ -397,15 +349,19 @@ async function startServer() {
       const error = validate(url);
       if (error) return res.status(400).json({ error });
       const upstream = await fetch(url, {
-        headers: upstreamHeaders(req), redirect: "follow", signal: AbortSignal.timeout(120000),
+        headers: upstreamHeaders(req),
+        redirect: "follow",
+        signal: AbortSignal.timeout(120000),
       });
       res.writeHead(upstream.status, {
         "Content-Type": contentType(upstream.headers.get("content-type"), "application/json; charset=utf-8"),
       });
       if (!upstream.body) return res.end();
-      Readable.fromWeb(upstream.body as any).pipe(res);
+      return Readable.fromWeb(upstream.body as any).pipe(res);
     } catch (error: any) {
-      if (!res.headersSent) res.status(502).json({ error: "Failed to connect to IPTV server", details: error.message });
+      if (!res.headersSent) {
+        return res.status(502).json({ error: "Failed to connect to IPTV server", details: error.message });
+      }
     }
   });
 
@@ -415,86 +371,58 @@ async function startServer() {
       const url = String(req.query.url || "");
       const error = validate(url);
       if (error) return res.status(400).send(error);
-      const { session, playback } = identity(req);
-      const isMkv = (() => { try { return /\.mkv$/i.test(new URL(url).pathname); } catch { return false; } })();
-      const requestedStart = Number(req.query.start);
-      const start = isMkv && Number.isFinite(requestedStart) ? Math.max(0, requestedStart) : 0;
 
       const extraHeaders: Record<string, string> = {};
-      if (!isMkv && typeof req.headers.range === "string") extraHeaders.Range = req.headers.range;
-
-      const fallback = mp4Fallback(url);
-      if (fallback) {
-        const upstream = await fetch(fallback, {
-          method: req.method, headers: upstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000),
-        });
-        if (upstream.ok) {
-          const responseHeaders: Record<string, string> = {
-            "Content-Type": contentType(upstream.headers.get("content-type"), "video/mp4"),
-            "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
-          };
-          for (const key of ["content-length", "content-range", "etag", "last-modified", "cache-control"]) {
-            const value = upstream.headers.get(key); if (value) responseHeaders[key] = value;
-          }
-          res.writeHead(upstream.status, responseHeaders);
-          if (req.method === "HEAD" || !upstream.body) return res.end();
-          const readable = Readable.fromWeb(upstream.body as any);
-          res.on("close", () => { try { readable.destroy(); } catch {} });
-          return readable.pipe(res);
-        }
-        console.log(`MP4 variant unavailable (${upstream.status}); MKV fallback available: ${url}`);
-      }
-
-      if (isMkv) {
-        if (req.method === "HEAD") {
-          const upstream = await fetch(url, { method: "HEAD", headers: upstreamHeaders(req), redirect: "follow", signal: AbortSignal.timeout(120000) });
-          if (!upstream.ok) return res.status(upstream.status).end();
-          return res.writeHead(upstream.status, {
-            "Content-Type": contentType(upstream.headers.get("content-type"), "video/x-matroska"),
-            "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
-          }).end();
-        }
-        if (session) stopActive(session, undefined, "new fallback MKV playback for same player session");
-        if (await transcodeMkvFallback(url, req, res, start, session, playback)) return;
-      }
-
+      if (typeof req.headers.range === "string") extraHeaders.Range = req.headers.range;
       const upstream = await fetch(url, {
-        method: req.method, headers: upstreamHeaders(req, extraHeaders), redirect: "follow", signal: AbortSignal.timeout(120000),
+        method: req.method,
+        headers: upstreamHeaders(req, extraHeaders),
+        redirect: "follow",
+        signal: AbortSignal.timeout(120000),
       });
-      if (!upstream.ok && upstream.status >= 400) return res.status(upstream.status).send(`Upstream stream error: ${upstream.status}`);
+      if (!upstream.ok && upstream.status >= 400) {
+        return res.status(upstream.status).send(`Upstream stream error: ${upstream.status}`);
+      }
+
       const lower = (upstream.url || url).toLowerCase();
-      const isM3u8 = lower.includes(".m3u8") || lower.includes("type=m3u_plus");
-      const type = contentType(
-        upstream.headers.get("content-type"),
-        isM3u8 ? "application/vnd.apple.mpegurl" : lower.includes(".ts") ? "video/mp2t" : lower.includes(".webm") ? "video/webm" : "video/mp4"
-      );
-      if ((isM3u8 || type.includes("mpegurl")) && req.method === "GET") {
+      const isM3u8 = lower.includes(".m3u8") || contentType(upstream.headers.get("content-type"), "").includes("mpegurl");
+      if (isM3u8 && req.method === "GET") {
         const body = rewriteM3u8(await upstream.text(), upstream.url || url, req);
         res.writeHead(upstream.status, {
-          "Content-Type": "application/vnd.apple.mpegurl", "Content-Length": Buffer.byteLength(body), "Cache-Control": "no-cache,no-store",
+          "Content-Type": "application/vnd.apple.mpegurl",
+          "Content-Length": Buffer.byteLength(body),
+          "Cache-Control": "no-cache,no-store",
         });
         return res.end(body);
       }
+
+      const type = contentType(
+        upstream.headers.get("content-type"),
+        lower.includes(".ts") ? "video/mp2t" : lower.includes(".webm") ? "video/webm" : "application/octet-stream"
+      );
       const responseHeaders: Record<string, string> = {
-        "Content-Type": type, "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
+        "Content-Type": type,
+        "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
       };
       for (const key of ["content-length", "content-range", "etag", "last-modified", "cache-control"]) {
-        const value = upstream.headers.get(key); if (value) responseHeaders[key] = value;
+        const value = upstream.headers.get(key);
+        if (value) responseHeaders[key] = value;
       }
       res.writeHead(upstream.status, responseHeaders);
       if (req.method === "HEAD" || !upstream.body) return res.end();
       const readable = Readable.fromWeb(upstream.body as any);
       res.on("close", () => { try { readable.destroy(); } catch {} });
-      readable.pipe(res);
+      return readable.pipe(res);
     } catch (error: any) {
       console.error("Proxy stream error:", error.stack || error);
-      if (!res.headersSent) res.status(502).send(`Upstream stream proxy error: ${error.message || error}`);
+      if (!res.headersSent) return res.status(502).send(`Upstream stream proxy error: ${error.message || error}`);
     }
   });
 
   app.get("/api/health", (_req, res) => res.json({
     status: "ok",
     device: "webos-iptv-player",
+    playbackTransport: "hls",
     ffmpegAvailable: !!ffmpegPath,
     activeTranscodes: active.size,
     hlsRoot: HLS_ROOT,
@@ -511,7 +439,7 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () =>
-    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT}`)
+    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT} (universal HLS playback)`)
   );
 }
 
