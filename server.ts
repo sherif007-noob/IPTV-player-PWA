@@ -205,22 +205,37 @@ async function startServer() {
     const dir = hlsDir(session, playback);
     await fs.promises.mkdir(dir, { recursive: true });
 
-    const headers = upstreamHeaders(req);
-    const ffmpegHeaders = Object.entries(headers)
-      .filter(([key]) => !["user-agent", "referer", "host"].includes(key.toLowerCase()))
-      .map(([key, value]) => `${key}: ${value}`)
-      .join("\r\n");
+    const abortController = new AbortController();
+    let upstream: Response;
+    try {
+      console.log(
+        `Fetching provider media in Node session=${session} playback=${playback} start=${start}s url=${url}`
+      );
+      upstream = await fetch(url, {
+        method: "GET",
+        headers: upstreamHeaders(req),
+        redirect: "follow",
+        signal: abortController.signal,
+      });
+    } catch (error: any) {
+      throw new Error(`Provider fetch failed: ${error?.message || error}`);
+    }
+
+    console.log(
+      `Provider media response status=${upstream.status} type=${upstream.headers.get("content-type") || "unknown"} length=${upstream.headers.get("content-length") || "unknown"} finalUrl=${upstream.url || url}`
+    );
+
+    if (!upstream.ok || !upstream.body) {
+      try { await upstream.body?.cancel(); } catch {}
+      throw new Error(`Provider media request failed with HTTP ${upstream.status}`);
+    }
+
     const playlist = path.join(dir, "index.m3u8");
     const segmentPattern = path.join(dir, "segment-%06d.ts");
     const args = [
       "-hide_banner", "-loglevel", "info", "-nostdin",
-      "-re",
+      "-i", "pipe:0",
       ...(start > 0 ? ["-ss", String(start)] : []),
-      "-user_agent", headers["User-Agent"] || PROVIDER_USER_AGENT,
-      ...(headers.Referer ? ["-referer", headers.Referer] : []),
-      ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\r\n`] : []),
-      "-rw_timeout", "120000000",
-      "-i", url,
       ...hlsTranscodeArgs(),
       "-f", "hls",
       "-hls_time", "2",
@@ -231,8 +246,12 @@ async function startServer() {
       playlist,
     ];
 
-    console.log(`Starting generated HLS session=${session} playback=${playback} start=${start}s inputUrl=${url}`);
-    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
+    console.log(
+      `Starting generated HLS from Node pipe session=${session} playback=${playback} start=${start}s source=${upstream.url || url}`
+    );
+
+    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "ignore", "pipe"] });
+    const readable = Readable.fromWeb(upstream.body as any);
     let stopped = false;
     let stderr = "";
 
@@ -240,27 +259,56 @@ async function startServer() {
       if (stopped) return;
       stopped = true;
       console.log(`Generated HLS stop session=${session} playback=${playback}: ${reason}`);
+      try { abortController.abort(); } catch {}
+      try { readable.destroy(); } catch {}
+      try { ffmpeg.stdin.destroy(); } catch {}
       try { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); } catch {}
       removePathSoon(dir);
     };
 
     register(session, playback, stop);
+
+    readable.on("error", (error: any) => {
+      if (!stopped) console.warn(
+        `Provider stream error session=${session} playback=${playback}: ${error?.message || error}`
+      );
+      try { ffmpeg.stdin.destroy(error); } catch {}
+    });
+
+    ffmpeg.stdin.on("error", (error: any) => {
+      if (!stopped && error?.code !== "EPIPE") {
+        console.warn(
+          `FFmpeg HLS stdin error session=${session} playback=${playback}: ${error?.message || error}`
+        );
+      }
+    });
+
     ffmpeg.stderr.on("data", (chunk) => {
       const text = chunk.toString();
       stderr = (stderr + text).slice(-8000);
       console.log(`FFmpeg HLS: ${text.trimEnd()}`);
     });
+
     ffmpeg.on("error", (error) => {
-      console.warn(`FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`);
+      console.warn(
+        `FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`
+      );
       clearActive(session, playback);
+      try { abortController.abort(); } catch {}
+      try { readable.destroy(); } catch {}
     });
-    ffmpeg.on("close", (code) => {
+
+    ffmpeg.on("close", (code, signal) => {
       clearActive(session, playback);
+      try { abortController.abort(); } catch {}
+      try { readable.destroy(); } catch {}
       console.log(
-        `FFmpeg HLS exited code=${code} stopped=${stopped} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
+        `FFmpeg HLS exited code=${code} signal=${signal || "none"} stopped=${stopped} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
       );
       if (!stopped) removePathSoon(dir, 5 * 60 * 1000);
     });
+
+    readable.pipe(ffmpeg.stdin);
   }
 
   app.get("/api/xtream/hls/:session/:playback/index.m3u8", async (req, res) => {
