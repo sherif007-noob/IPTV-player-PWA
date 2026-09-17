@@ -13,13 +13,13 @@ const PROVIDER_ORIGIN = process.env.PROVIDER_ORIGIN || "";
 const ALLOWED_IPTV_HOSTS = process.env.ALLOWED_IPTV_HOSTS
   ? process.env.ALLOWED_IPTV_HOSTS.split(",").map((host) => host.trim().toLowerCase())
   : [];
-const PORT = Number(process.env.PORT || 3000);\nconst HLS_ROOT = path.join(os.tmpdir(), `iptv-player-hls-${PORT}`);
+const PORT = Number(process.env.PORT || 3000);
+const HLS_ROOT = path.join(os.tmpdir(), `iptv-player-hls-${PORT}`);
 
 type StopFn = (reason: string) => void;
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
   const active = new Map<string, { playback: string; stop: StopFn }>();
 
   app.use(express.json());
