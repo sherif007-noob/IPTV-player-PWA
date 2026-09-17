@@ -88,6 +88,27 @@ function withPlaybackIdentity(value: string, session: string, playback: string):
   return parsed.toString();
 }
 
+function toHlsPlaybackUrl(value: string): string {
+  const parsed = parseUrl(value);
+  const upstream = getProxyUpstreamUrl(value);
+  if (!parsed || !upstream || !/\.mkv$/i.test(upstream.pathname)) return value;
+
+  const session = parsed.searchParams.get('session');
+  const playback = parsed.searchParams.get('playback');
+  if (!session || !playback) return value;
+
+  const hls = new URL(
+    `/api/xtream/hls/${encodeURIComponent(session)}/${encodeURIComponent(playback)}/index.m3u8`,
+    parsed.origin
+  );
+  hls.searchParams.set('url', upstream.toString());
+  for (const key of ['start', 'ua', 'referer', 'origin']) {
+    const parameter = parsed.searchParams.get(key);
+    if (parameter) hls.searchParams.set(key, parameter);
+  }
+  return hls.toString();
+}
+
 function createSessionId(): string {
   return `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -328,15 +349,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (metadataDuration > 0) setDuration(metadataDuration);
       return;
     }
-
     const video = videoRef.current;
     if (!video) return;
     const mediaDuration = Number(video.duration);
-    if (Number.isFinite(mediaDuration) && mediaDuration > 0) {
-      setDuration(mediaDuration);
-    } else if (metadataDuration > 0) {
-      setDuration(metadataDuration);
-    }
+    if (Number.isFinite(mediaDuration) && mediaDuration > 0) setDuration(mediaDuration);
+    else if (metadataDuration > 0) setDuration(metadataDuration);
   }, [activeUrl, metadataDuration]);
 
   useEffect(() => {
@@ -355,6 +372,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const video = videoRef.current;
     if (!video || !activeUrl) return;
 
+    const mediaUrl = isTranscodedMkvUrl(activeUrl) ? toHlsPlaybackUrl(activeUrl) : activeUrl;
     const shouldResume = resumeAfterSourceChangeRef.current;
     let hls: Hls | null = null;
     let metadataHandler: (() => void) | null = null;
@@ -369,7 +387,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const onReady = () => {
       updateDurationFromMedia();
-
       if (!isTranscodedMkvUrl(activeUrl) && initialNativeSeekRef.current > 0) {
         const target = initialNativeSeekRef.current;
         initialNativeSeekRef.current = 0;
@@ -387,7 +404,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       else safePause();
     };
 
-    if (isHlsUrl(activeUrl, isLive) && Hls.isSupported()) {
+    const hlsMedia = isHlsUrl(mediaUrl, isLive);
+    const nativeHls = hlsMedia && !!video.canPlayType('application/vnd.apple.mpegurl');
+
+    if (nativeHls) {
+      metadataHandler = onReady;
+      video.addEventListener('loadedmetadata', metadataHandler, { once: true });
+      video.preload = 'auto';
+      video.src = mediaUrl;
+      video.load();
+      console.log(`Native HLS playback: ${mediaUrl}`);
+    } else if (hlsMedia && Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -398,7 +425,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       });
       hlsRef.current = hls;
       hls.attachMedia(video);
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls?.loadSource(activeUrl));
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls?.loadSource(mediaUrl));
       hls.on(Hls.Events.MANIFEST_PARSED, onReady);
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (!data.fatal) return;
@@ -411,11 +438,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setIsBuffering(false);
         }
       });
+      console.log(`hls.js playback: ${mediaUrl}`);
     } else {
       metadataHandler = onReady;
       video.addEventListener('loadedmetadata', metadataHandler, { once: true });
       video.preload = 'auto';
-      video.src = activeUrl;
+      video.src = mediaUrl;
       video.load();
     }
 
@@ -492,10 +520,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     });
   }, [activeUrl, duration, isLive, isSeries, item, logicalCurrentTime, onUpdateProgress, seriesContext]);
 
-  useEffect(() => {
-    progressRef.current = recordProgress;
-  }, [recordProgress]);
-
+  useEffect(() => { progressRef.current = recordProgress; }, [recordProgress]);
   useEffect(() => {
     const timer = window.setInterval(() => progressRef.current(), 30000);
     return () => window.clearInterval(timer);
@@ -512,7 +537,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (isTranscodedMkvUrl(activeUrl)) {
       const currentAbsolute = logicalCurrentTime();
       if (Math.abs(currentAbsolute - target) < 0.75) return;
-
       resumeAfterSourceChangeRef.current = wasPlaying;
       const nextUrl = buildPlaybackUrl(activeUrl, target);
       setCurrentTime(target);
@@ -522,7 +546,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setActiveUrl(nextUrl);
       setSeekFeedback(`${target >= currentAbsolute ? '+' : '-'}${Math.round(Math.abs(target - currentAbsolute))}s`);
       window.setTimeout(() => setSeekFeedback(null), 1000);
-      console.log(`Transcoded VOD hard source switch: target=${Math.floor(target)}s url=${nextUrl}`);
+      console.log(`Transcoded VOD HLS source switch: target=${Math.floor(target)}s url=${nextUrl}`);
       return;
     }
 
@@ -582,23 +606,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const onKeyDown = (event: KeyboardEvent) => {
       const code = event.keyCode || event.which;
       if (code === 27 || code === 461 || code === 10009 || event.key === 'Escape' || event.key === 'BrowserBack') {
-        event.preventDefault();
-        closePlayer();
-        return;
+        event.preventDefault(); closePlayer(); return;
       }
       if (code === 32 || code === 415 || code === 19) {
-        event.preventDefault();
-        togglePlay();
-        return;
+        event.preventDefault(); togglePlay(); return;
       }
       if (!isLive && (code === 37 || code === 412)) {
-        event.preventDefault();
-        handleSeek(-10);
-        return;
+        event.preventDefault(); handleSeek(-10); return;
       }
       if (!isLive && (code === 39 || code === 417)) {
-        event.preventDefault();
-        handleSeek(10);
+        event.preventDefault(); handleSeek(10);
       }
     };
     window.addEventListener('keydown', onKeyDown, true);
@@ -640,7 +657,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             const error = video.error;
             if (error?.code === MediaError.MEDIA_ERR_ABORTED) return;
             const detail = error?.message || `media error ${error?.code || 'unknown'}`;
-            console.warn('Video element playback error:', detail, 'src=', activeUrl);
+            console.warn('Video element playback error:', detail, 'src=', video.currentSrc || activeUrl);
             setIsBuffering(false);
             setIsPlaying(false);
             setPlaybackError(`The media stream could not be loaded (${detail}).`);
@@ -682,12 +699,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   setActiveUrl((previous) => buildPlaybackUrl(previous, getSourceStart(previous)));
                 }}
                 className="px-4 py-2 rounded-lg bg-sky-500 text-white font-semibold"
-              >
-                Retry
-              </button>
-              <button onClick={closePlayer} className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold">
-                Close
-              </button>
+              >Retry</button>
+              <button onClick={closePlayer} className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold">Close</button>
             </div>
           </div>
         </div>
@@ -704,10 +717,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       <div className={`absolute top-0 inset-x-0 z-30 p-5 bg-gradient-to-b from-black/95 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <button
-              onClick={closePlayer}
-              className="p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white"
-            >
+            <button onClick={closePlayer} className="p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="min-w-0">
