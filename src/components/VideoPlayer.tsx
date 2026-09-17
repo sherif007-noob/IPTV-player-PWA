@@ -80,10 +80,128 @@ function withStart(value: string, seconds: number): string {
   return parsed.toString();
 }
 
+function withPlaybackIdentity(value: string, session: string, playback: string): string {
+  const parsed = parseUrl(value);
+  if (!parsed || !parsed.pathname.endsWith('/api/xtream/stream')) return value;
+  parsed.searchParams.set('session', session);
+  parsed.searchParams.set('playback', playback);
+  return parsed.toString();
+}
+
+function createSessionId(): string {
+  return `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function isHlsUrl(value: string, isLive: boolean): boolean {
   if (value.includes('.m3u8')) return true;
   if (isLive && !/\.(mp4|mkv|webm|avi)(?:\?|$)/i.test(value)) return true;
   return false;
+}
+
+function parseDurationSeconds(value: unknown): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+  if (typeof value !== 'string') return 0;
+  const text = value.trim();
+  if (!text) return 0;
+
+  const numeric = Number(text);
+  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+
+  const parts = text.split(':').map((part) => Number(part));
+  if (parts.some((part) => !Number.isFinite(part) || part < 0)) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return 0;
+}
+
+function getKnownDuration(item: ContentItem, seriesContext?: VideoPlayerProps['seriesContext']): number {
+  const itemAny = item as any;
+  const candidates = [
+    seriesContext?.episode?.info?.duration_secs,
+    seriesContext?.episode?.info?.duration,
+    itemAny.duration_secs,
+    itemAny.duration_sec,
+    itemAny.duration,
+  ];
+
+  for (const candidate of candidates) {
+    const seconds = parseDurationSeconds(candidate);
+    if (seconds > 0) return seconds;
+  }
+  return 0;
+}
+
+const durationLookupCache = new Map<string, number>();
+
+async function lookupXtreamDuration(
+  value: string,
+  seriesContext?: VideoPlayerProps['seriesContext']
+): Promise<number> {
+  const source = parseUrl(value);
+  const upstream = getProxyUpstreamUrl(value);
+  if (!source || !upstream) return 0;
+
+  const cacheKey = upstream.toString();
+  if (durationLookupCache.has(cacheKey)) return durationLookupCache.get(cacheKey) || 0;
+
+  try {
+    const parts = upstream.pathname.split('/').filter(Boolean);
+    if (parts.length < 4) return 0;
+    const section = parts[0].toLowerCase();
+    const username = parts[1];
+    const password = parts[2];
+    const mediaId = parts[3].replace(/\.[^.]+$/, '');
+    if (!username || !password || !mediaId) return 0;
+
+    const apiUrl = new URL('/player_api.php', upstream.origin);
+    apiUrl.searchParams.set('username', username);
+    apiUrl.searchParams.set('password', password);
+
+    if (section === 'movie') {
+      apiUrl.searchParams.set('action', 'get_vod_info');
+      apiUrl.searchParams.set('vod_id', mediaId);
+    } else if (section === 'series' && seriesContext?.seriesId) {
+      apiUrl.searchParams.set('action', 'get_series_info');
+      apiUrl.searchParams.set('series_id', String(seriesContext.seriesId));
+    } else {
+      durationLookupCache.set(cacheKey, 0);
+      return 0;
+    }
+
+    const proxy = new URL('/api/xtream/proxy', source.origin);
+    proxy.searchParams.set('url', apiUrl.toString());
+    const response = await fetch(proxy.toString(), { cache: 'no-store' });
+    if (!response.ok) {
+      durationLookupCache.set(cacheKey, 0);
+      return 0;
+    }
+
+    const data = await response.json();
+    let seconds = 0;
+    if (section === 'movie') {
+      seconds = parseDurationSeconds(
+        data?.info?.duration_secs ?? data?.info?.duration_sec ?? data?.info?.duration
+      );
+    } else {
+      const groups = data?.episodes && typeof data.episodes === 'object'
+        ? Object.values(data.episodes)
+        : [];
+      const episodes = groups.flatMap((group: any) => Array.isArray(group) ? group : []);
+      const episode = episodes.find((entry: any) => String(entry?.id) === String(mediaId));
+      seconds = parseDurationSeconds(
+        episode?.info?.duration_secs ?? episode?.info?.duration ?? episode?.duration
+      );
+    }
+
+    durationLookupCache.set(cacheKey, seconds > 0 ? seconds : 0);
+    return seconds > 0 ? seconds : 0;
+  } catch (error) {
+    console.warn('Duration lookup notice:', error);
+    durationLookupCache.set(cacheKey, 0);
+    return 0;
+  }
 }
 
 function formatTime(seconds: number): string {
@@ -95,6 +213,34 @@ function formatTime(seconds: number): string {
   return hours > 0
     ? `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
     : `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function hardStopVideo(video: HTMLVideoElement | null) {
+  if (!video) return;
+  try { video.pause(); } catch {}
+  try {
+    video.removeAttribute('src');
+    video.load();
+  } catch {}
+}
+
+function stopPlaybackUrl(value: string) {
+  const parsed = parseUrl(value);
+  if (!parsed || !parsed.pathname.endsWith('/api/xtream/stream')) return;
+  const session = parsed.searchParams.get('session');
+  const playback = parsed.searchParams.get('playback');
+  if (!session || !playback) return;
+
+  try {
+    const stopUrl = new URL('/api/xtream/stop', parsed.origin);
+    stopUrl.searchParams.set('session', session);
+    stopUrl.searchParams.set('playback', playback);
+    void fetch(stopUrl.toString(), {
+      method: 'POST',
+      cache: 'no-store',
+      keepalive: true,
+    }).catch(() => {});
+  } catch {}
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -114,24 +260,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const playPromiseRef = useRef<Promise<void> | null>(null);
   const resumeAfterSourceChangeRef = useRef(true);
   const initialNativeSeekRef = useRef(Math.max(0, initialTime));
-  const sourceGenerationRef = useRef(0);
   const progressRef = useRef<() => void>(() => {});
+  const sessionRef = useRef(createSessionId());
+  const playbackCounterRef = useRef(0);
 
-  const initialUrl = isTranscodedMkvUrl(streamUrl) && initialTime > 0
-    ? withStart(streamUrl, initialTime)
-    : streamUrl;
-
-  const [activeUrl, setActiveUrl] = useState(initialUrl);
+  const [activeUrl, setActiveUrl] = useState('');
   const [isPlaying, setIsPlaying] = useState(true);
   const [isBuffering, setIsBuffering] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState(
-    isTranscodedMkvUrl(initialUrl) ? getSourceStart(initialUrl) : 0
-  );
-  const [duration, setDuration] = useState(() => {
-    const episodeDuration = Number(seriesContext?.episode?.info?.duration_secs || 0);
-    return Number.isFinite(episodeDuration) && episodeDuration > 0 ? episodeDuration : 0;
-  });
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(() => getKnownDuration(item, seriesContext));
   const [buffered, setBuffered] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [seekFeedback, setSeekFeedback] = useState<string | null>(null);
@@ -142,6 +280,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const isLive = item.type === 'live';
   const isSeries = item.type === 'series' || !!seriesContext;
+  const metadataDuration = getKnownDuration(item, seriesContext);
+
+  const buildPlaybackUrl = useCallback((baseUrl: string, startSeconds?: number) => {
+    let next = baseUrl;
+    if (typeof startSeconds === 'number' && isTranscodedMkvUrl(baseUrl)) {
+      next = withStart(baseUrl, startSeconds);
+    }
+    const playback = String(++playbackCounterRef.current);
+    return withPlaybackIdentity(next, sessionRef.current, playback);
+  }, []);
 
   const safePlay = useCallback(() => {
     const video = videoRef.current;
@@ -171,47 +319,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const safePause = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
-    try {
-      video.pause();
-    } catch {}
+    try { video.pause(); } catch {}
     setIsPlaying(false);
   }, []);
 
   const updateDurationFromMedia = useCallback(() => {
+    if (isTranscodedMkvUrl(activeUrl)) {
+      if (metadataDuration > 0) setDuration(metadataDuration);
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
     const mediaDuration = Number(video.duration);
     if (Number.isFinite(mediaDuration) && mediaDuration > 0) {
       setDuration(mediaDuration);
-      return;
+    } else if (metadataDuration > 0) {
+      setDuration(metadataDuration);
     }
-    const episodeDuration = Number(seriesContext?.episode?.info?.duration_secs || 0);
-    if (Number.isFinite(episodeDuration) && episodeDuration > 0) setDuration(episodeDuration);
-  }, [seriesContext]);
+  }, [activeUrl, metadataDuration]);
 
-  // A stream prop change is a new title/episode. Resume MKV transcodes by putting the
-  // saved position directly into the very first media URL instead of trying to seek a
-  // non-seekable fragmented MP4 after it has started.
   useEffect(() => {
-    const next = isTranscodedMkvUrl(streamUrl) && initialTime > 0
-      ? withStart(streamUrl, initialTime)
-      : streamUrl;
+    const next = buildPlaybackUrl(streamUrl, initialTime > 0 ? initialTime : undefined);
     initialNativeSeekRef.current = isTranscodedMkvUrl(next) ? 0 : Math.max(0, initialTime);
     resumeAfterSourceChangeRef.current = true;
     setActiveUrl(next);
     setCurrentTime(isTranscodedMkvUrl(next) ? getSourceStart(next) : 0);
+    setBuffered(0);
+    setDuration(getKnownDuration(item, seriesContext));
     setPlaybackError(null);
     setIsBuffering(true);
-  }, [streamUrl, initialTime]);
+  }, [buildPlaybackUrl, initialTime, item.id, metadataDuration, seriesContext?.episode?.id, streamUrl]);
 
-  // SINGLE SOURCE OWNER: this is the only place that assigns video.src / loads media.
-  // Manual seeks only change activeUrl. No sourceRevision, no pending URL ref, no
-  // setTimeout reload, and no second code path that can abort the new request.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !activeUrl) return;
 
-    const generation = ++sourceGenerationRef.current;
     const shouldResume = resumeAfterSourceChangeRef.current;
     let hls: Hls | null = null;
     let metadataHandler: (() => void) | null = null;
@@ -225,7 +368,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const onReady = () => {
-      if (generation !== sourceGenerationRef.current) return;
       updateDurationFromMedia();
 
       if (!isTranscodedMkvUrl(activeUrl) && initialNativeSeekRef.current > 0) {
@@ -234,7 +376,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         try { video.currentTime = target; } catch {}
       }
 
-      const tracks = Array.from(video.textTracks || []).map((track, id) => ({
+      const tracks = Array.from(video.textTracks || []).map((track: TextTrack, id) => ({
         id,
         label: track.label || `Track ${id + 1}`,
         language: track.language || '',
@@ -256,13 +398,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       });
       hlsRef.current = hls;
       hls.attachMedia(video);
-      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        if (generation !== sourceGenerationRef.current) return;
-        hls?.loadSource(activeUrl);
-      });
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => hls?.loadSource(activeUrl));
       hls.on(Hls.Events.MANIFEST_PARSED, onReady);
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data.fatal || generation !== sourceGenerationRef.current) return;
+        if (!data.fatal) return;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
           try { hls?.startLoad(); } catch {}
         } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -286,10 +425,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         try { hls.destroy(); } catch {}
         if (hlsRef.current === hls) hlsRef.current = null;
       }
-      // Deliberately do NOT clear video.src here. The next effect replaces it once.
-      // Clearing it during an activeUrl transition is what repeatedly aborted seeks.
+      stopPlaybackUrl(activeUrl);
+      hardStopVideo(video);
     };
   }, [activeUrl, isLive, safePause, safePlay, updateDurationFromMedia]);
+
+  useEffect(() => {
+    if (!activeUrl || !isTranscodedMkvUrl(activeUrl) || duration > 0) return;
+    let cancelled = false;
+    void lookupXtreamDuration(activeUrl, seriesContext).then((seconds) => {
+      if (!cancelled && seconds > 0) setDuration(seconds);
+    });
+    return () => { cancelled = true; };
+  }, [activeUrl, duration, seriesContext?.seriesId]);
 
   const logicalCurrentTime = useCallback(() => {
     const video = videoRef.current;
@@ -318,8 +466,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     const timestamp = logicalCurrentTime();
-    const mediaDuration = Number(video.duration);
-    const knownDuration = Number.isFinite(mediaDuration) && mediaDuration > 0 ? mediaDuration : duration;
+    let knownDuration = duration;
+    if (!isTranscodedMkvUrl(activeUrl)) {
+      const mediaDuration = Number(video.duration);
+      if (Number.isFinite(mediaDuration) && mediaDuration > 0) knownDuration = mediaDuration;
+    }
     if (!(timestamp > 0) || !(knownDuration > 0)) return;
 
     onUpdateProgress({
@@ -346,7 +497,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [recordProgress]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => progressRef.current(), 4000);
+    const timer = window.setInterval(() => progressRef.current(), 30000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -363,7 +514,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       if (Math.abs(currentAbsolute - target) < 0.75) return;
 
       resumeAfterSourceChangeRef.current = wasPlaying;
-      const nextUrl = withStart(activeUrl, target);
+      const nextUrl = buildPlaybackUrl(activeUrl, target);
       setCurrentTime(target);
       setBuffered(target);
       setIsBuffering(true);
@@ -371,7 +522,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setActiveUrl(nextUrl);
       setSeekFeedback(`${target >= currentAbsolute ? '+' : '-'}${Math.round(Math.abs(target - currentAbsolute))}s`);
       window.setTimeout(() => setSeekFeedback(null), 1000);
-      console.log(`Transcoded VOD source switch: target=${Math.floor(target)}s url=${nextUrl}`);
+      console.log(`Transcoded VOD hard source switch: target=${Math.floor(target)}s url=${nextUrl}`);
       return;
     }
 
@@ -379,7 +530,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       video.currentTime = target;
       setCurrentTime(target);
     } catch {}
-  }, [activeUrl, duration, isLive, logicalCurrentTime]);
+  }, [activeUrl, buildPlaybackUrl, duration, isLive, logicalCurrentTime]);
 
   const handleSeek = useCallback((delta: number) => {
     seekToPosition(currentTime + delta);
@@ -396,6 +547,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       recordProgress();
     }
   }, [recordProgress, safePause, safePlay]);
+
+  const closePlayer = useCallback(() => {
+    progressRef.current();
+    stopPlaybackUrl(activeUrl);
+    if (hlsRef.current) {
+      try { hlsRef.current.destroy(); } catch {}
+      hlsRef.current = null;
+    }
+    hardStopVideo(videoRef.current);
+    onClose();
+  }, [activeUrl, onClose]);
 
   const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;
@@ -421,8 +583,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       const code = event.keyCode || event.which;
       if (code === 27 || code === 461 || code === 10009 || event.key === 'Escape' || event.key === 'BrowserBack') {
         event.preventDefault();
-        progressRef.current();
-        onClose();
+        closePlayer();
         return;
       }
       if (code === 32 || code === 415 || code === 19) {
@@ -442,7 +603,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [handleSeek, isLive, onClose, togglePlay]);
+  }, [closePlayer, handleSeek, isLive, togglePlay]);
 
   const nextEpisode = isSeries && seriesContext?.allEpisodes
     ? seriesContext.allEpisodes.find((episode) => episode.episode_num === seriesContext.episode.episode_num + 1)
@@ -457,42 +618,46 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onMouseMove={() => setShowControls(true)}
       onClick={() => setShowControls(true)}
     >
-      <video
-        ref={videoRef}
-        id="webos-hardware-video"
-        className="w-full h-full object-contain"
-        onTimeUpdate={handleTimeUpdate}
-        onDurationChange={updateDurationFromMedia}
-        onLoadStart={() => setIsBuffering(true)}
-        onWaiting={() => setIsBuffering(true)}
-        onCanPlay={() => setIsBuffering(false)}
-        onPlaying={() => {
-          setIsBuffering(false);
-          setIsPlaying(true);
-          setPlaybackError(null);
-        }}
-        onPause={() => setIsPlaying(false)}
-        onError={() => {
-          const error = videoRef.current?.error;
-          if (error?.code === MediaError.MEDIA_ERR_ABORTED) return;
-          const detail = error?.message || `media error ${error?.code || 'unknown'}`;
-          console.warn('Video element playback error:', detail, 'src=', activeUrl);
-          setIsBuffering(false);
-          setIsPlaying(false);
-          setPlaybackError(`The media stream could not be loaded (${detail}).`);
-        }}
-        onEnded={() => {
-          recordProgress();
-          if (isSeries && nextEpisode && onSelectEpisode && seriesContext) {
-            onSelectEpisode(nextEpisode, seriesContext.seasonNum);
-          } else if (isSeries && seriesContext && onEpisodeEnded) {
-            onEpisodeEnded(seriesContext.episode, seriesContext.seasonNum);
-          }
-        }}
-        playsInline
-        // @ts-ignore
-        webos-media-playback="true"
-      />
+      {activeUrl && (
+        <video
+          key={activeUrl}
+          ref={videoRef}
+          id="webos-hardware-video"
+          className="w-full h-full object-contain"
+          onTimeUpdate={handleTimeUpdate}
+          onDurationChange={updateDurationFromMedia}
+          onLoadStart={() => setIsBuffering(true)}
+          onWaiting={() => setIsBuffering(true)}
+          onCanPlay={() => setIsBuffering(false)}
+          onPlaying={() => {
+            setIsBuffering(false);
+            setIsPlaying(true);
+            setPlaybackError(null);
+          }}
+          onPause={() => setIsPlaying(false)}
+          onError={(event) => {
+            const video = event.currentTarget;
+            const error = video.error;
+            if (error?.code === MediaError.MEDIA_ERR_ABORTED) return;
+            const detail = error?.message || `media error ${error?.code || 'unknown'}`;
+            console.warn('Video element playback error:', detail, 'src=', activeUrl);
+            setIsBuffering(false);
+            setIsPlaying(false);
+            setPlaybackError(`The media stream could not be loaded (${detail}).`);
+          }}
+          onEnded={() => {
+            recordProgress();
+            if (isSeries && nextEpisode && onSelectEpisode && seriesContext) {
+              onSelectEpisode(nextEpisode, seriesContext.seasonNum);
+            } else if (isSeries && seriesContext && onEpisodeEnded) {
+              onEpisodeEnded(seriesContext.episode, seriesContext.seasonNum);
+            }
+          }}
+          playsInline
+          // @ts-ignore
+          webos-media-playback="true"
+        />
+      )}
 
       {isBuffering && !playbackError && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
@@ -514,18 +679,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   resumeAfterSourceChangeRef.current = true;
                   setPlaybackError(null);
                   setIsBuffering(true);
-                  setActiveUrl((previous) => {
-                    const parsed = parseUrl(previous);
-                    if (!parsed) return previous;
-                    parsed.searchParams.set('_r', String(Date.now()));
-                    return parsed.toString();
-                  });
+                  setActiveUrl((previous) => buildPlaybackUrl(previous, getSourceStart(previous)));
                 }}
                 className="px-4 py-2 rounded-lg bg-sky-500 text-white font-semibold"
               >
                 Retry
               </button>
-              <button onClick={onClose} className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold">
+              <button onClick={closePlayer} className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold">
                 Close
               </button>
             </div>
@@ -545,10 +705,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
-              onClick={() => {
-                recordProgress();
-                onClose();
-              }}
+              onClick={closePlayer}
               className="p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -606,7 +763,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         {!isLive && (
           <div className="mb-4">
             <div
-              className="relative h-3 rounded-full bg-slate-800 cursor-pointer overflow-hidden"
+              className={`relative h-3 rounded-full bg-slate-800 overflow-hidden ${duration > 0 ? 'cursor-pointer' : 'cursor-wait opacity-70'}`}
               onClick={(event) => {
                 if (!(duration > 0)) return;
                 const rect = event.currentTarget.getBoundingClientRect();
@@ -619,7 +776,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             </div>
             <div className="mt-2 flex justify-between text-xs font-mono text-slate-300">
               <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
+              <span>{duration > 0 ? formatTime(duration) : '--:--'}</span>
             </div>
           </div>
         )}
