@@ -45,10 +45,19 @@ function parseUrl(value: string): URL | null {
   }
 }
 
-function getProxyUpstreamUrl(value: string): URL | null {
+function canonicalProxyUrl(value: string): URL | null {
   const parsed = parseUrl(value);
-  if (!parsed || !parsed.pathname.endsWith('/api/xtream/stream')) return null;
-  const upstream = parsed.searchParams.get('url');
+  if (!parsed) return null;
+  if (parsed.pathname.endsWith('/api/xtream/stream') && parsed.searchParams.get('url')) return parsed;
+
+  const wrapped = new URL('/api/xtream/stream', window.location.origin);
+  wrapped.searchParams.set('url', parsed.toString());
+  return wrapped;
+}
+
+function getUpstreamUrl(value: string): URL | null {
+  const parsed = canonicalProxyUrl(value);
+  const upstream = parsed?.searchParams.get('url');
   if (!upstream) return null;
   try {
     return new URL(upstream);
@@ -57,41 +66,44 @@ function getProxyUpstreamUrl(value: string): URL | null {
   }
 }
 
-function isTranscodedMkvUrl(value: string): boolean {
-  const upstream = getProxyUpstreamUrl(value);
-  return !!upstream && /\.mkv$/i.test(upstream.pathname);
+function isProviderHls(value: string): boolean {
+  const upstream = getUpstreamUrl(value);
+  if (!upstream) return false;
+  return /\.m3u8$/i.test(upstream.pathname) || upstream.searchParams.get('type') === 'm3u_plus';
+}
+
+function usesGeneratedHls(value: string): boolean {
+  return !!getUpstreamUrl(value) && !isProviderHls(value);
 }
 
 function getSourceStart(value: string): number {
-  const parsed = parseUrl(value);
+  const parsed = canonicalProxyUrl(value);
   if (!parsed) return 0;
   const start = Number(parsed.searchParams.get('start') || '0');
   return Number.isFinite(start) && start > 0 ? start : 0;
 }
 
 function withStart(value: string, seconds: number): string {
-  const parsed = parseUrl(value);
+  const parsed = canonicalProxyUrl(value);
   if (!parsed) return value;
   const target = Math.max(0, Math.floor(seconds));
   if (target > 0) parsed.searchParams.set('start', String(target));
   else parsed.searchParams.delete('start');
-  parsed.searchParams.delete('_r');
-  parsed.searchParams.delete('_t');
   return parsed.toString();
 }
 
 function withPlaybackIdentity(value: string, session: string, playback: string): string {
-  const parsed = parseUrl(value);
-  if (!parsed || !parsed.pathname.endsWith('/api/xtream/stream')) return value;
+  const parsed = canonicalProxyUrl(value);
+  if (!parsed) return value;
   parsed.searchParams.set('session', session);
   parsed.searchParams.set('playback', playback);
   return parsed.toString();
 }
 
 function toHlsPlaybackUrl(value: string): string {
-  const parsed = parseUrl(value);
-  const upstream = getProxyUpstreamUrl(value);
-  if (!parsed || !upstream || !/\.mkv$/i.test(upstream.pathname)) return value;
+  const parsed = canonicalProxyUrl(value);
+  const upstream = getUpstreamUrl(value);
+  if (!parsed || !upstream) return value;
 
   const session = parsed.searchParams.get('session');
   const playback = parsed.searchParams.get('playback');
@@ -99,7 +111,7 @@ function toHlsPlaybackUrl(value: string): string {
 
   const hls = new URL(
     `/api/xtream/hls/${encodeURIComponent(session)}/${encodeURIComponent(playback)}/index.m3u8`,
-    parsed.origin
+    window.location.origin
   );
   hls.searchParams.set('url', upstream.toString());
   for (const key of ['start', 'ua', 'referer', 'origin']) {
@@ -111,12 +123,6 @@ function toHlsPlaybackUrl(value: string): string {
 
 function createSessionId(): string {
   return `player-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function isHlsUrl(value: string, isLive: boolean): boolean {
-  if (value.includes('.m3u8')) return true;
-  if (isLive && !/\.(mp4|mkv|webm|avi)(?:\?|$)/i.test(value)) return true;
-  return false;
 }
 
 function parseDurationSeconds(value: unknown): number {
@@ -160,8 +166,8 @@ async function lookupXtreamDuration(
   value: string,
   seriesContext?: VideoPlayerProps['seriesContext']
 ): Promise<number> {
-  const source = parseUrl(value);
-  const upstream = getProxyUpstreamUrl(value);
+  const source = canonicalProxyUrl(value);
+  const upstream = getUpstreamUrl(value);
   if (!source || !upstream) return 0;
 
   const cacheKey = upstream.toString();
@@ -246,22 +252,20 @@ function hardStopVideo(video: HTMLVideoElement | null) {
 }
 
 function stopPlaybackUrl(value: string) {
-  const parsed = parseUrl(value);
-  if (!parsed || !parsed.pathname.endsWith('/api/xtream/stream')) return;
+  const parsed = canonicalProxyUrl(value);
+  if (!parsed) return;
   const session = parsed.searchParams.get('session');
   const playback = parsed.searchParams.get('playback');
   if (!session || !playback) return;
 
-  try {
-    const stopUrl = new URL('/api/xtream/stop', parsed.origin);
-    stopUrl.searchParams.set('session', session);
-    stopUrl.searchParams.set('playback', playback);
-    void fetch(stopUrl.toString(), {
-      method: 'POST',
-      cache: 'no-store',
-      keepalive: true,
-    }).catch(() => {});
-  } catch {}
+  const stopUrl = new URL('/api/xtream/stop', window.location.origin);
+  stopUrl.searchParams.set('session', session);
+  stopUrl.searchParams.set('playback', playback);
+  void fetch(stopUrl.toString(), {
+    method: 'POST',
+    cache: 'no-store',
+    keepalive: true,
+  }).catch(() => {});
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -304,12 +308,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const metadataDuration = getKnownDuration(item, seriesContext);
 
   const buildPlaybackUrl = useCallback((baseUrl: string, startSeconds?: number) => {
-    let next = baseUrl;
-    if (typeof startSeconds === 'number' && isTranscodedMkvUrl(baseUrl)) {
-      next = withStart(baseUrl, startSeconds);
-    }
-    const playback = String(++playbackCounterRef.current);
-    return withPlaybackIdentity(next, sessionRef.current, playback);
+    let next = withPlaybackIdentity(baseUrl, sessionRef.current, String(++playbackCounterRef.current));
+    if (typeof startSeconds === 'number' && startSeconds > 0) next = withStart(next, startSeconds);
+    else next = withStart(next, 0);
+    return next;
   }, []);
 
   const safePlay = useCallback(() => {
@@ -345,7 +347,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, []);
 
   const updateDurationFromMedia = useCallback(() => {
-    if (isTranscodedMkvUrl(activeUrl)) {
+    if (usesGeneratedHls(activeUrl)) {
       if (metadataDuration > 0) setDuration(metadataDuration);
       return;
     }
@@ -357,11 +359,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [activeUrl, metadataDuration]);
 
   useEffect(() => {
-    const next = buildPlaybackUrl(streamUrl, initialTime > 0 ? initialTime : undefined);
-    initialNativeSeekRef.current = isTranscodedMkvUrl(next) ? 0 : Math.max(0, initialTime);
+    const generated = usesGeneratedHls(streamUrl);
+    const next = buildPlaybackUrl(streamUrl, generated && initialTime > 0 ? initialTime : undefined);
+    initialNativeSeekRef.current = generated ? 0 : Math.max(0, initialTime);
     resumeAfterSourceChangeRef.current = true;
     setActiveUrl(next);
-    setCurrentTime(isTranscodedMkvUrl(next) ? getSourceStart(next) : 0);
+    setCurrentTime(generated ? getSourceStart(next) : 0);
     setBuffered(0);
     setDuration(getKnownDuration(item, seriesContext));
     setPlaybackError(null);
@@ -372,7 +375,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const video = videoRef.current;
     if (!video || !activeUrl) return;
 
-    const mediaUrl = isTranscodedMkvUrl(activeUrl) ? toHlsPlaybackUrl(activeUrl) : activeUrl;
+    const mediaUrl = toHlsPlaybackUrl(activeUrl);
     const shouldResume = resumeAfterSourceChangeRef.current;
     let hls: Hls | null = null;
     let metadataHandler: (() => void) | null = null;
@@ -387,7 +390,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const onReady = () => {
       updateDurationFromMedia();
-      if (!isTranscodedMkvUrl(activeUrl) && initialNativeSeekRef.current > 0) {
+      if (!usesGeneratedHls(activeUrl) && initialNativeSeekRef.current > 0) {
         const target = initialNativeSeekRef.current;
         initialNativeSeekRef.current = 0;
         try { video.currentTime = target; } catch {}
@@ -404,17 +407,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       else safePause();
     };
 
-    const hlsMedia = isHlsUrl(mediaUrl, isLive);
-    const nativeHls = hlsMedia && !!video.canPlayType('application/vnd.apple.mpegurl');
-
+    const nativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
     if (nativeHls) {
       metadataHandler = onReady;
       video.addEventListener('loadedmetadata', metadataHandler, { once: true });
       video.preload = 'auto';
       video.src = mediaUrl;
       video.load();
-      console.log(`Native HLS playback: ${mediaUrl}`);
-    } else if (hlsMedia && Hls.isSupported()) {
+      console.log(`Universal HLS (native): ${mediaUrl}`);
+    } else if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -438,13 +439,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setIsBuffering(false);
         }
       });
-      console.log(`hls.js playback: ${mediaUrl}`);
+      console.log(`Universal HLS (hls.js): ${mediaUrl}`);
     } else {
-      metadataHandler = onReady;
-      video.addEventListener('loadedmetadata', metadataHandler, { once: true });
-      video.preload = 'auto';
-      video.src = mediaUrl;
-      video.load();
+      setIsBuffering(false);
+      setPlaybackError('This browser does not support HLS playback.');
     }
 
     return () => {
@@ -456,28 +454,28 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       stopPlaybackUrl(activeUrl);
       hardStopVideo(video);
     };
-  }, [activeUrl, isLive, safePause, safePlay, updateDurationFromMedia]);
+  }, [activeUrl, safePause, safePlay, updateDurationFromMedia]);
 
   useEffect(() => {
-    if (!activeUrl || !isTranscodedMkvUrl(activeUrl) || duration > 0) return;
+    if (!activeUrl || isLive || !usesGeneratedHls(activeUrl) || duration > 0) return;
     let cancelled = false;
     void lookupXtreamDuration(activeUrl, seriesContext).then((seconds) => {
       if (!cancelled && seconds > 0) setDuration(seconds);
     });
     return () => { cancelled = true; };
-  }, [activeUrl, duration, seriesContext?.seriesId]);
+  }, [activeUrl, duration, isLive, seriesContext?.seriesId]);
 
   const logicalCurrentTime = useCallback(() => {
     const video = videoRef.current;
     if (!video) return currentTime;
     const raw = Number(video.currentTime);
     if (!Number.isFinite(raw)) return currentTime;
-    return isTranscodedMkvUrl(activeUrl) ? getSourceStart(activeUrl) + raw : raw;
+    return usesGeneratedHls(activeUrl) ? getSourceStart(activeUrl) + raw : raw;
   }, [activeUrl, currentTime]);
 
   const recordProgress = useCallback(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !activeUrl) return;
 
     if (isLive) {
       onUpdateProgress({
@@ -495,7 +493,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const timestamp = logicalCurrentTime();
     let knownDuration = duration;
-    if (!isTranscodedMkvUrl(activeUrl)) {
+    if (!usesGeneratedHls(activeUrl)) {
       const mediaDuration = Number(video.duration);
       if (Number.isFinite(mediaDuration) && mediaDuration > 0) knownDuration = mediaDuration;
     }
@@ -534,7 +532,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const target = Math.max(0, Math.min(upper, requestedSeconds));
     const wasPlaying = !video.paused;
 
-    if (isTranscodedMkvUrl(activeUrl)) {
+    if (usesGeneratedHls(activeUrl)) {
       const currentAbsolute = logicalCurrentTime();
       if (Math.abs(currentAbsolute - target) < 0.75) return;
       resumeAfterSourceChangeRef.current = wasPlaying;
@@ -546,7 +544,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       setActiveUrl(nextUrl);
       setSeekFeedback(`${target >= currentAbsolute ? '+' : '-'}${Math.round(Math.abs(target - currentAbsolute))}s`);
       window.setTimeout(() => setSeekFeedback(null), 1000);
-      console.log(`Transcoded VOD HLS source switch: target=${Math.floor(target)}s url=${nextUrl}`);
+      console.log(`Universal HLS source switch: target=${Math.floor(target)}s url=${nextUrl}`);
       return;
     }
 
@@ -589,7 +587,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const raw = Number(video.currentTime);
     if (!Number.isFinite(raw)) return;
 
-    const start = isTranscodedMkvUrl(activeUrl) ? getSourceStart(activeUrl) : 0;
+    const start = usesGeneratedHls(activeUrl) ? getSourceStart(activeUrl) : 0;
     const absolute = start + raw;
     setCurrentTime(absolute);
 
@@ -657,10 +655,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             const error = video.error;
             if (error?.code === MediaError.MEDIA_ERR_ABORTED) return;
             const detail = error?.message || `media error ${error?.code || 'unknown'}`;
-            console.warn('Video element playback error:', detail, 'src=', video.currentSrc || activeUrl);
+            console.warn('HLS video playback error:', detail, 'src=', video.currentSrc || activeUrl);
             setIsBuffering(false);
             setIsPlaying(false);
-            setPlaybackError(`The media stream could not be loaded (${detail}).`);
+            setPlaybackError(`The HLS stream could not be loaded (${detail}).`);
           }}
           onEnded={() => {
             recordProgress();
