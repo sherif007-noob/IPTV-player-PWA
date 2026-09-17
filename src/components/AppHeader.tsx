@@ -15,9 +15,10 @@ import {
   ChevronDown,
   Type,
   Check,
+  Menu,
 } from 'lucide-react';
 import { MainNavView, TvFontSize } from '../types';
-import { FONT_NAMES } from '../hooks/useStorage';
+import { FONT_NAMES, FONT_SCALES } from '../hooks/useStorage';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface AppHeaderProps {
@@ -33,13 +34,15 @@ interface AppHeaderProps {
   selectedCategoryName?: string;
   tvFontSize?: TvFontSize;
   onSelectFontSize?: (size: TvFontSize) => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 const FONT_OPTIONS: { id: TvFontSize; label: string; previewClass: string }[] = [
-  { id: 'small', label: 'Small (100%)', previewClass: 'text-xs' },
+  { id: 'small', label: 'Small (100% - Mobile)', previewClass: 'text-xs' },
   { id: 'medium', label: 'Medium (125%)', previewClass: 'text-sm' },
   { id: 'large', label: 'Large (150%)', previewClass: 'text-base' },
-  { id: 'huge', label: 'Huge (180% - Default)', previewClass: 'text-lg font-bold' },
+  { id: 'huge', label: 'Huge (180% - TV)', previewClass: 'text-lg font-bold' },
   { id: 'maximum', label: 'Maximum (210%)', previewClass: 'text-xl font-bold' },
 ];
 
@@ -56,6 +59,8 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
   selectedCategoryName,
   tvFontSize = 'huge',
   onSelectFontSize,
+  isSidebarOpen = false,
+  onToggleSidebar,
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
@@ -79,28 +84,49 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
 
   const searchPlaceholder =
     currentView === 'vod'
-      ? 'Search movie titles in real-time...'
+      ? 'Search movie titles...'
       : currentView === 'series'
-      ? 'Search TV series titles in real-time...'
+      ? 'Search TV series titles...'
       : currentView === 'live'
-      ? 'Search live channels in real-time...'
+      ? 'Search live channels...'
       : 'Search all library titles...';
 
-  const currentFontLabel = FONT_NAMES[tvFontSize] || 'Huge (180%)';
+  const currentScaleText = FONT_SCALES[tvFontSize] || '100%';
 
   return (
     <header
       id="app-top-header"
-      className="h-16 px-4 sm:px-6 bg-slate-950/85 backdrop-blur-xl border-b border-white/10 flex items-center justify-between gap-4 z-20 shrink-0 select-none shadow-lg shadow-black/40"
+      className="h-16 px-3 sm:px-6 bg-slate-950/85 backdrop-blur-xl border-b border-white/10 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0 select-none shadow-lg shadow-black/40"
     >
       {/* Brand & Home Navigation */}
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        {/* Hamburger Menu Button to Toggle Categories Sidebar */}
+        <button
+          id="btn-header-hamburger"
+          data-skip-spatial="false"
+          onClick={onToggleSidebar}
+          onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+          title={isSidebarOpen && currentView !== 'home' ? 'Hide sidebar' : 'Show categories sidebar'}
+          aria-label="Toggle categories sidebar"
+          className={`flex items-center justify-center p-2 rounded-xl border tv-focus transition-all duration-200 ${
+            isSidebarOpen && currentView !== 'home'
+              ? 'bg-sky-500/20 text-sky-400 border-sky-400/50 shadow-sm shadow-sky-500/20'
+              : 'bg-slate-900/70 backdrop-blur-md border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
+          }`}
+        >
+          {isSidebarOpen && currentView !== 'home' ? (
+            <X className="w-4 h-4 text-sky-400" />
+          ) : (
+            <Menu className="w-4 h-4 text-sky-400" />
+          )}
+        </button>
+
         <button
           id="btn-header-home"
           onClick={onNavigateHome}
           onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
           title="Return to Home Dashboard"
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border tv-focus transition-all duration-200 ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl border tv-focus transition-all duration-200 ${
             currentView === 'home'
               ? 'bg-sky-500 text-white border-sky-300 font-bold shadow-md shadow-sky-500/30'
               : 'bg-slate-900/70 backdrop-blur-md border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
@@ -111,7 +137,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
         </button>
 
         {/* Section Quick Switcher Chips */}
-        <div className="flex items-center gap-1.5 border-l border-white/10 pl-2 sm:pl-3">
+        <div className="flex items-center gap-1 sm:gap-1.5 border-l border-white/10 pl-1.5 sm:pl-3">
           {sections.map((sec) => {
             const Icon = sec.icon;
             const isActive = currentView === sec.id;
@@ -121,14 +147,14 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
                 id={`header-tab-${sec.id}`}
                 onClick={() => onSelectView(sec.id)}
                 onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold tv-focus transition-all duration-200 ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold tv-focus transition-all duration-200 ${
                   isActive
                     ? 'bg-sky-500 text-white border border-sky-300 font-bold shadow-md shadow-sky-500/30'
                     : 'bg-slate-900/60 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
                 }`}
               >
                 <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-sky-400'}`} />
-                <span>{sec.label}</span>
+                <span className="hidden sm:inline">{sec.label}</span>
               </button>
             );
           })}
@@ -202,7 +228,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           >
             <Type className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             <span className="text-xs font-medium text-sky-300 font-sans">
-              {currentFontLabel.split(' ')[0]} ({FONT_NAMES[tvFontSize]?.match(/\(([^)]+)\)/)?.[1] || '180%'})
+              {currentScaleText}
             </span>
             <ChevronDown className="w-3 h-3 text-slate-400" />
           </button>

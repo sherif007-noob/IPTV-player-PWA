@@ -58,6 +58,24 @@ export default function App() {
   const [series, setSeries] = useState<SeriesItem[]>([]);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
 
+  // Sidebar visibility state: defaults to false on mobile screens (< 768px), true on desktop/TV
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth >= 768;
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setIsSidebarOpen(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Search state (Header searchbar)
   const [headerSearchQuery, setHeaderSearchQuery] = useState<string>('');
 
@@ -204,9 +222,22 @@ export default function App() {
     setHeaderSearchQuery('');
   };
 
+  // Toggle Categories Sidebar
+  const handleToggleSidebar = () => {
+    if (currentView === 'home') {
+      handleSelectView('live');
+      setIsSidebarOpen(true);
+    } else {
+      setIsSidebarOpen((prev) => !prev);
+    }
+  };
+
   // Category Selection
   const handleSelectCategory = (catId: string) => {
     setSelectedCategoryId(catId);
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
     if (currentView !== 'home') {
       if (catId.startsWith('special_')) {
         // Ensure section content is loaded
@@ -708,10 +739,12 @@ export default function App() {
         selectedCategoryName={selectedCategoryName}
         tvFontSize={storage.tvFontSize}
         onSelectFontSize={storage.setTvFontSize}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
       />
 
       {/* 2. Main Body Area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* If Home Starting Page is Active AND no search is being typed */}
         {currentView === 'home' && !headerSearchQuery.trim() ? (
           <HomePortal
@@ -725,45 +758,67 @@ export default function App() {
           />
         ) : (
           <>
-            {/* The ONLY Sidebar: Category Sidebar for genres & categories from Xtream server */}
+            {/* The Category Sidebar for genres & categories from Xtream server */}
             {showCategorySidebar && !headerSearchQuery.trim() && (
-              <CategorySidebar
-                title={
-                  currentView === 'live'
-                    ? 'Live TV'
-                    : currentView === 'vod'
-                    ? 'Movies'
-                    : 'Series'
-                }
-                categories={categories}
-                selectedCategoryId={selectedCategoryId}
-                onSelectCategory={handleSelectCategory}
-                categoryCounts={categoryCounts}
-                favoritesCount={sectionFavoritesCount}
-                continueCount={sectionContinueCount}
-                watchlistCount={sectionWatchlistCount}
-                onClearFavorites={() => {
-                  if (currentView === 'live' || currentView === 'vod' || currentView === 'series') {
-                    storage.clearFavorites(currentView);
-                  } else {
-                    storage.clearFavorites();
-                  }
-                }}
-                onClearContinue={() => {
-                  if (currentView === 'live' || currentView === 'vod' || currentView === 'series') {
-                    storage.clearContinueWatching(currentView);
-                  } else {
-                    storage.clearContinueWatching();
-                  }
-                }}
-                onClearWatchlist={() => {
-                  if (currentView === 'vod' || currentView === 'series') {
-                    storage.clearWatchlist(currentView);
-                  } else {
-                    storage.clearWatchlist();
-                  }
-                }}
-              />
+              <>
+                {/* Mobile Backdrop */}
+                {isSidebarOpen && (
+                  <div
+                    id="sidebar-mobile-backdrop"
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                  />
+                )}
+
+                {/* Sidebar Drawer Container */}
+                <div
+                  id="category-sidebar-wrapper"
+                  className={`
+                    fixed inset-y-0 left-0 top-16 z-40 md:static md:top-auto md:z-auto
+                    h-[calc(100vh-4rem)] md:h-full transition-transform duration-300 ease-in-out
+                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:hidden'}
+                  `}
+                >
+                  <CategorySidebar
+                    title={
+                      currentView === 'live'
+                        ? 'Live TV'
+                        : currentView === 'vod'
+                        ? 'Movies'
+                        : 'Series'
+                    }
+                    categories={categories}
+                    selectedCategoryId={selectedCategoryId}
+                    onSelectCategory={handleSelectCategory}
+                    categoryCounts={categoryCounts}
+                    favoritesCount={sectionFavoritesCount}
+                    continueCount={sectionContinueCount}
+                    watchlistCount={sectionWatchlistCount}
+                    onClose={() => setIsSidebarOpen(false)}
+                    onClearFavorites={() => {
+                      if (currentView === 'live' || currentView === 'vod' || currentView === 'series') {
+                        storage.clearFavorites(currentView);
+                      } else {
+                        storage.clearFavorites();
+                      }
+                    }}
+                    onClearContinue={() => {
+                      if (currentView === 'live' || currentView === 'vod' || currentView === 'series') {
+                        storage.clearContinueWatching(currentView);
+                      } else {
+                        storage.clearContinueWatching();
+                      }
+                    }}
+                    onClearWatchlist={() => {
+                      if (currentView === 'vod' || currentView === 'series') {
+                        storage.clearWatchlist(currentView);
+                      } else {
+                        storage.clearWatchlist();
+                      }
+                    }}
+                  />
+                </div>
+              </>
             )}
 
             {/* Content Stage Grid */}

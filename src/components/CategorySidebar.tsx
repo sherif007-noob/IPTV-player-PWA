@@ -7,6 +7,7 @@ import {
   Star,
   History,
   Bookmark,
+  X,
 } from 'lucide-react';
 import { XtreamCategory } from '../types';
 
@@ -22,6 +23,7 @@ interface CategorySidebarProps {
   onClearFavorites?: () => void;
   onClearContinue?: () => void;
   onClearWatchlist?: () => void;
+  onClose?: () => void;
 }
 
 const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
@@ -36,6 +38,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
   onClearFavorites,
   onClearContinue,
   onClearWatchlist,
+  onClose,
 }) => {
   const [filterQuery, setFilterQuery] = useState('');
 
@@ -53,7 +56,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
   return (
     <div
       id="category-sidebar-panel"
-      className="w-64 bg-slate-950/80 backdrop-blur-xl border-r border-white/10 flex flex-col shrink-0 select-none shadow-xl"
+      className="w-72 sm:w-80 md:w-64 max-w-[85vw] h-full bg-slate-950/95 md:bg-slate-950/80 backdrop-blur-xl border-r border-white/10 flex flex-col shrink-0 select-none shadow-2xl md:shadow-xl"
     >
       {/* Category Header */}
       <div className="p-3.5 border-b border-white/10 space-y-2">
@@ -64,9 +67,21 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
               {title} Categories
             </h3>
           </div>
-          <span className="text-[11px] font-mono text-sky-300 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/25">
-            {categories.length}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-sky-300 px-2 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/25">
+              {categories.length}
+            </span>
+            {onClose && (
+              <button
+                id="btn-close-category-sidebar"
+                onClick={onClose}
+                title="Close Categories Sidebar"
+                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Quick Filter Input for Genres */}

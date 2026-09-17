@@ -16,12 +16,44 @@ export const FONT_SCALES: Record<TvFontSize, string> = {
 };
 
 export const FONT_NAMES: Record<TvFontSize, string> = {
-  small: 'Small (100%)',
+  small: 'Small (100% - Mobile Default)',
   medium: 'Medium (125%)',
   large: 'Large (150%)',
-  huge: 'Huge (180% - Default)',
+  huge: 'Huge (180% - TV Default)',
   maximum: 'Maximum (210%)',
 };
+
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  const isSmallScreen = window.innerWidth <= 768;
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(
+    navigator.userAgent
+  );
+  return isSmallScreen || isMobileUA;
+}
+
+function getInitialTvFontSize(): TvFontSize {
+  try {
+    const isMobile = isMobileDevice();
+    const userSelected = localStorage.getItem('tv_font_user_selected');
+    const saved = localStorage.getItem(FONT_SIZE_KEY) as TvFontSize;
+
+    // If the user explicitly picked a font size from the dropdown, respect it
+    if (userSelected && saved && ['small', 'medium', 'large', 'huge', 'maximum'].includes(saved)) {
+      return saved;
+    }
+
+    // On mobile devices, default scaling is 100% ('small')
+    if (isMobile) {
+      return 'small';
+    }
+
+    if (saved && ['small', 'medium', 'large', 'huge', 'maximum'].includes(saved)) {
+      return saved;
+    }
+  } catch {}
+  return 'huge';
+}
 
 function normalizeTranscodedProgress(progress: PlaybackProgress): PlaybackProgress {
   if (progress.type === 'live' || typeof window === 'undefined') return progress;
@@ -43,20 +75,15 @@ function normalizeTranscodedProgress(progress: PlaybackProgress): PlaybackProgre
 }
 
 export function useStorage() {
-  const [tvFontSize, setTvFontSizeState] = useState<TvFontSize>(() => {
-    try {
-      const saved = localStorage.getItem(FONT_SIZE_KEY) as TvFontSize;
-      if (saved && ['small', 'medium', 'large', 'huge', 'maximum'].includes(saved)) return saved;
-    } catch {}
-    return 'huge';
-  });
+  const [tvFontSize, setTvFontSizeState] = useState<TvFontSize>(getInitialTvFontSize);
 
   const setTvFontSize = useCallback((size: TvFontSize) => {
     setTvFontSizeState(size);
     try {
       localStorage.setItem(FONT_SIZE_KEY, size);
+      localStorage.setItem('tv_font_user_selected', 'true');
       document.documentElement.setAttribute('data-tv-font', size);
-      document.documentElement.style.fontSize = FONT_SCALES[size] || '180%';
+      document.documentElement.style.fontSize = FONT_SCALES[size] || '100%';
     } catch (e) {
       console.error('Failed to save font size', e);
     }
@@ -65,7 +92,7 @@ export function useStorage() {
   useEffect(() => {
     try {
       document.documentElement.setAttribute('data-tv-font', tvFontSize);
-      document.documentElement.style.fontSize = FONT_SCALES[tvFontSize] || '180%';
+      document.documentElement.style.fontSize = FONT_SCALES[tvFontSize] || '100%';
     } catch (e) {}
   }, [tvFontSize]);
 

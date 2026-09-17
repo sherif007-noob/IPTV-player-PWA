@@ -20,10 +20,13 @@
     <script>
       (function() {
         try {
-          var saved = localStorage.getItem('webos_tv_font_size') || 'huge';
-          document.documentElement.setAttribute('data-tv-font', saved);
-          var scales = { small: '100%', medium: '120%', large: '150%', huge: '180%', maximum: '210%' };
-          document.documentElement.style.fontSize = scales[saved] || '180%';
+          var isMobile = (window.innerWidth <= 768) || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
+          var userSelected = localStorage.getItem('tv_font_user_selected');
+          var saved = localStorage.getItem('webos_tv_font_size');
+          var font = (userSelected && saved) ? saved : (isMobile ? 'small' : (saved || 'huge'));
+          document.documentElement.setAttribute('data-tv-font', font);
+          var scales = { small: '100%', medium: '125%', large: '150%', huge: '180%', maximum: '210%' };
+          document.documentElement.style.fontSize = scales[font] || (isMobile ? '100%' : '180%');
         } catch(e) {}
       })();
     </script>
