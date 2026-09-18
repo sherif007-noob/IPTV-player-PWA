@@ -1445,3 +1445,156 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     transform: translate(-50%, -50%) scale(1);
   }
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Pass 2: real frosted overlay header + scroll-aware reveal                  */
+/* -------------------------------------------------------------------------- */
+
+#webos-iptv-root {
+  --app-header-offset: var(--app-header-height, 64px);
+}
+
+#webos-iptv-root[data-header-hidden="true"] {
+  --app-header-offset: 0px;
+}
+
+/*
+ * The header no longer consumes layout height. The app's scroll surfaces start
+ * behind it, which gives backdrop-filter real poster/content pixels to frost.
+ */
+.app-header-overlay {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  isolation: isolate;
+  overflow: visible;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+  will-change: transform, opacity;
+  transition:
+    transform var(--ds-motion-normal) var(--ds-ease-premium),
+    opacity var(--ds-motion-normal) var(--ds-ease-standard);
+}
+
+.app-header-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(7, 12, 26, 0.64), rgba(7, 12, 26, 0.48));
+  -webkit-backdrop-filter: blur(var(--ds-blur-chrome)) saturate(155%);
+  backdrop-filter: blur(var(--ds-blur-chrome)) saturate(155%);
+  border-bottom: 1px solid var(--ds-glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--ds-glass-highlight),
+    0 12px 38px rgba(0, 0, 0, 0.28);
+}
+
+.app-header-overlay > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-header-overlay.app-header-hidden {
+  transform: translate3d(0, calc(-100% - 2px), 0);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Header control geometry: icon/text content is centered independently of width. */
+.header-control {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.header-control > svg {
+  flex: 0 0 auto;
+}
+
+.app-header-primary,
+.app-header-tabs,
+.app-header-actions {
+  align-items: center;
+}
+
+.header-search-input {
+  min-height: 36px;
+}
+
+@media (any-pointer: coarse) {
+  .header-search-input {
+    min-height: var(--ds-touch-target);
+  }
+}
+
+/* Content begins beneath the header but continues scrolling behind the glass. */
+#home-portal-dashboard.header-underlay-scroll {
+  padding-top: calc(var(--app-header-height, 64px) + clamp(14px, 2.25vw, 40px)) !important;
+  scroll-padding-top: calc(var(--app-header-offset) + 16px);
+}
+
+.library-scroll-stage {
+  padding-top: var(--app-header-height, 64px);
+  scroll-padding-top: calc(var(--app-header-offset) + 48px);
+}
+
+.library-subheader {
+  position: sticky;
+  top: var(--app-header-offset);
+  z-index: 16;
+  transition: top var(--ds-motion-normal) var(--ds-ease-premium);
+}
+
+/* Desktop category rail follows the visible header; mobile drawer remains full-screen. */
+@media (min-width: 768px) {
+  #category-sidebar-wrapper {
+    padding-top: var(--app-header-offset);
+    transition:
+      padding-top var(--ds-motion-normal) var(--ds-ease-premium),
+      transform var(--ds-motion-normal) ease-in-out;
+  }
+}
+
+@media (max-width: 640px) {
+  #home-portal-dashboard.header-underlay-scroll {
+    padding-top: calc(var(--app-header-height, 96px) + 14px) !important;
+  }
+
+  .header-icon-control-mobile {
+    width: var(--ds-touch-target) !important;
+    height: var(--ds-touch-target) !important;
+    min-width: var(--ds-touch-target) !important;
+    min-height: var(--ds-touch-target) !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .header-icon-control-mobile > svg {
+    margin: 0 !important;
+  }
+}
+
+/* When motion reduction is requested, state changes remain immediate and stable. */
+@media (prefers-reduced-motion: reduce) {
+  .app-header-overlay,
+  .library-subheader,
+  #category-sidebar-wrapper {
+    transition: none !important;
+  }
+}
