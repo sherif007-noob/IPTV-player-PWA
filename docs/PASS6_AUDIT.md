@@ -161,3 +161,11 @@ The final audit round added these additional protections after the initial repor
 - Duplicate Home/Stream card transform rules and explicit poster zoom classes were removed so `.interactive-card` is the sole owner of card lift/press/poster zoom behavior.
 
 These additions are included in the current `UX_QA_CHECKLIST.md` regression gate.
+
+
+## Final cache-integrity hardening
+
+The last Pass 6 review identified and fixed two additional stale-data hazards:
+
+- VOD/Series detail-request dedupe/cache keys are now provider-scoped (normalized server + username + content ID). Switching providers/accounts can no longer reuse a five-minute detail payload from another provider that happens to share the same numeric ID.
+- Persistent catalog invalidation now has a separate persistence generation. Requests that began before a manual persistent-cache invalidation may finish, but they are not allowed to write their old result back into IndexedDB after the invalidation completes. Ordinary navigation-only memory release still permits useful late results to persist for future rehydration.
