@@ -220,3 +220,11 @@ The controls timer must retain one generation/deadline owner. Do not add a secon
 - Opening a special list must not trigger an unnecessary full VOD/Series provider catalog fetch.
 - Returning Home releases large catalog arrays from active application/service memory; returning to the section may rehydrate them from IndexedDB.
 - Home global search lazily loads missing full catalogs and releases search-only catalog memory when abandoned.
+
+
+## Synthetic-category/provider guard
+
+- Selecting Favorites, Continue Watching, or Watchlist must never send `special_*` as an Xtream provider `category_id`.
+- Auto-refresh while a special list is open must not start an All-catalog or synthetic-category request.
+- Switching between Movies and Series must release the inactive large catalog from application/service memory while leaving IndexedDB intact.
+- If a released request finishes late, it may persist to IndexedDB but must not repopulate the released hot/service cache.
