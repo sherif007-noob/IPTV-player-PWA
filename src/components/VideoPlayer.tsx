@@ -616,6 +616,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const flushProgress = () => progressRef.current();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushProgress();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', flushProgress);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', flushProgress);
+    };
+  }, []);
+
   const seekToPosition = useCallback((requestedSeconds: number) => {
     const video = videoRef.current;
     if (!video || isLive || !Number.isFinite(requestedSeconds)) return false;
