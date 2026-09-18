@@ -281,7 +281,7 @@ export default function App() {
             .then(setCategories)
             .catch((error) => console.warn('VOD category refresh notice:', error));
           const vodList = await xtreamService.getVodStreams(catId);
-          if (catId === 'all') fullCatalogLoadedRef.current.vod = true;
+          fullCatalogLoadedRef.current.vod = catId === 'all';
           setMovies(vodList);
           setIsLoadingContent(false);
           await categoriesPromise;
@@ -290,7 +290,7 @@ export default function App() {
             .then(setCategories)
             .catch((error) => console.warn('Series category refresh notice:', error));
           const sList = await xtreamService.getSeries(catId);
-          if (catId === 'all') fullCatalogLoadedRef.current.series = true;
+          fullCatalogLoadedRef.current.series = catId === 'all';
           setSeries(sList);
           setIsLoadingContent(false);
           await categoriesPromise;
@@ -419,7 +419,21 @@ export default function App() {
   const handleSelectCategory = (catId: string) => {
     setSelectedCategoryId(catId);
     if (isCompactNavigation) setIsSidebarOpen(false);
-    if (currentView !== 'home' && !catId.startsWith('special_')) {
+
+    if (catId.startsWith('special_')) {
+      // Special lists are rendered directly from persisted user state. Release
+      // large VOD/Series arrays instead of keeping an unnecessary full catalog in RAM.
+      if (currentView === 'vod') {
+        setMovies([]);
+        fullCatalogLoadedRef.current.vod = false;
+      } else if (currentView === 'series') {
+        setSeries([]);
+        fullCatalogLoadedRef.current.series = false;
+      }
+      return;
+    }
+
+    if (currentView !== 'home') {
       loadViewData(currentView as MainNavView, catId);
     }
   };
@@ -438,6 +452,13 @@ export default function App() {
       setServerInfo(xtreamService.getServerInfo());
       if (currentView !== 'home') {
         if (selectedCategoryId.startsWith('special_')) {
+          if (currentView === 'vod') {
+            setMovies([]);
+            fullCatalogLoadedRef.current.vod = false;
+          } else if (currentView === 'series') {
+            setSeries([]);
+            fullCatalogLoadedRef.current.series = false;
+          }
           if (currentView === 'live' || currentView === 'vod' || currentView === 'series') {
             const refreshedCategories = await xtreamService.getCategories(currentView);
             setCategories(refreshedCategories);
@@ -466,17 +487,15 @@ export default function App() {
 
   useEffect(() => {
     if (!isHomeSearchActive) {
-      if (currentView === 'home') {
-        if (homeSearchOwnedCatalogsRef.current.vod) {
-          setMovies([]);
-          fullCatalogLoadedRef.current.vod = false;
-        }
-        if (homeSearchOwnedCatalogsRef.current.series) {
-          setSeries([]);
-          fullCatalogLoadedRef.current.series = false;
-        }
-        homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
+      if (homeSearchOwnedCatalogsRef.current.vod && currentView !== 'vod') {
+        setMovies([]);
+        fullCatalogLoadedRef.current.vod = false;
       }
+      if (homeSearchOwnedCatalogsRef.current.series && currentView !== 'series') {
+        setSeries([]);
+        fullCatalogLoadedRef.current.series = false;
+      }
+      homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
       return;
     }
 
@@ -486,7 +505,7 @@ export default function App() {
       setRefreshNotice('Loading full library search...');
 
       if (!fullCatalogLoadedRef.current.vod) {
-        const owned = movies.length === 0;
+        const owned = true;
         tasks.push(
           xtreamService.getVodStreams('all').then((vodList) => {
             if (cancelled) return;
@@ -498,7 +517,7 @@ export default function App() {
       }
 
       if (!fullCatalogLoadedRef.current.series) {
-        const owned = series.length === 0;
+        const owned = true;
         tasks.push(
           xtreamService.getSeries('all').then((seriesList) => {
             if (cancelled) return;
@@ -983,7 +1002,11 @@ export default function App() {
 
   // Category counts
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: sectionTotalCount };
+    // "All" is only a truthful count while the current array represents All.
+    // Category-specific fetches intentionally do not download the whole catalog.
+    const counts: Record<string, number> = {
+      all: selectedCategoryId === 'all' ? sectionTotalCount : 0,
+    };
     const rawList =
       currentView === 'live'
         ? liveChannels
@@ -1000,7 +1023,7 @@ export default function App() {
       }
     });
     return counts;
-  }, [currentView, liveChannels, movies, series, sectionTotalCount]);
+  }, [currentView, liveChannels, movies, series, sectionTotalCount, selectedCategoryId]);
 
   // Only show the Category Sidebar when browsing Live TV, Movies, or Series
   const showCategorySidebar =
