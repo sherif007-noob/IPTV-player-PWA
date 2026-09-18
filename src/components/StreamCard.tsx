@@ -44,7 +44,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
           onSelect(item);
         }
       }}
-      className="group relative rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-md border border-white/10 overflow-hidden cursor-pointer tv-focus flex flex-col hover:border-sky-400 focus:border-sky-400 shadow-lg hover:shadow-sky-500/20 hover:-translate-y-1 transition-all duration-300"
+      className="stream-card group relative rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-md border border-white/10 overflow-hidden cursor-pointer tv-focus flex flex-col hover:border-sky-400 focus:border-sky-400 shadow-lg hover:shadow-sky-500/20 hover:-translate-y-1 transition-all duration-300"
     >
       {/* Media Thumbnail Container */}
       <div
@@ -78,7 +78,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
         )}
 
         {/* Hover / Focus Play Overlay */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+        <div className="stream-card-play-overlay absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
           <div className="w-10 h-10 rounded-full bg-sky-500/90 text-white flex items-center justify-center shadow-lg shadow-sky-500/50 group-hover:scale-110 transition-transform duration-300">
             <Play className="w-5 h-5 fill-current ml-0.5" />
           </div>
@@ -100,7 +100,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
         </div>
 
         {/* Action Buttons Overlay (Favorite, Watchlist) */}
-        <div className="absolute top-2 right-2 flex items-center gap-1 z-10 opacity-80 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
+        <div className="stream-card-actions absolute top-2 right-2 flex items-center gap-1 z-10 opacity-80 group-hover:opacity-100 group-focus:opacity-100 transition-opacity">
           <button
             id={`btn-fav-${item.id}`}
             onClick={(e) => {
@@ -108,7 +108,8 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
               onToggleFavorite(item);
             }}
             title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-            className={`p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
+            aria-pressed={isFavorite}
+            className={`stream-card-action p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
               isFavorite
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/40'
                 : 'bg-slate-950/70 border border-white/10 text-slate-300 hover:text-amber-400 hover:bg-slate-900/90'
@@ -125,7 +126,8 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
                 onToggleWatchlist(item);
               }}
               title={isInWatchlist ? 'In watchlist' : 'Add to watchlist'}
-              className={`p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
+              aria-pressed={isInWatchlist}
+              className={`stream-card-action p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
                 isInWatchlist
                   ? 'bg-sky-500 text-white shadow-md shadow-sky-500/40'
                   : 'bg-slate-950/70 border border-white/10 text-slate-300 hover:text-sky-400 hover:bg-slate-900/90'
@@ -150,7 +152,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
       {/* Card Metadata */}
       <div className="p-3 flex-1 flex flex-col justify-between">
         <div>
-          <h4 className="text-xs font-semibold text-slate-200 line-clamp-1 group-hover:text-sky-300 transition-colors">
+          <h4 className="stream-card-title text-xs font-semibold text-slate-200 line-clamp-1 group-hover:text-sky-300 transition-colors">
             {item.name}
           </h4>
 
