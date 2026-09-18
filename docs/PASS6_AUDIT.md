@@ -175,3 +175,9 @@ The last Pass 6 review identified and fixed two additional stale-data hazards:
 
 - In-flight catalog dedupe cleanup is identity-safe: an older Promise can no longer delete a newer Promise's map entry after invalidation/key reuse.
 - Provider-scoped VOD/Series detail caches are bounded and prune expired entries, preventing long-running sessions/provider switches from accumulating detail payloads indefinitely.
+
+
+### Storage compile/identity correction
+
+- Added the missing React `useRef` import required by the synchronous Continue Watching persistence ref.
+- `removeProgress` now accepts an optional content type so callers can remove one Live/VOD/Series identity without deleting another content type that shares the same numeric ID.
