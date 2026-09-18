@@ -1350,7 +1350,7 @@ export default function App() {
                         <StreamCard
                           key={`${item.type}-${item.id}`}
                           item={item}
-                          progress={storage.getProgress(item.id)}
+                          progress={storage.getProgress(item.id, item.type)}
                           isFavorite={storage.isFavorite(item.id, item.type)}
                           isInWatchlist={storage.isInWatchlist(item.id, item.type)}
                           onSelect={handleSelectCard}
@@ -1389,7 +1389,7 @@ export default function App() {
       {selectedDetailsItem && (
         <DetailsModal
           item={selectedDetailsItem}
-          progress={storage.getProgress(selectedDetailsItem.id)}
+          progress={storage.getProgress(selectedDetailsItem.id, selectedDetailsItem.type)}
           lastSeriesProgress={
             selectedDetailsItem.type === 'series'
               ? storage.getSeriesProgress(Number(selectedDetailsItem.id))
