@@ -181,6 +181,18 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     ? getSeasonProgress(Number(item.id), selectedSeason, currentEpisodes.length)
     : null;
 
+  const selectSeason = (seasonNumber: number) => {
+    setSelectedSeason(seasonNumber);
+    window.requestAnimationFrame(() => {
+      document.getElementById('episodes-scrollable-grid')?.scrollTo({ top: 0, behavior: 'smooth' });
+      document.getElementById(`tab-season-${seasonNumber}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    });
+  };
+
   return (
     <ModalShell
       onClose={onClose}
@@ -188,12 +200,12 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       cardId="details-card-container"
       ariaLabel="Title details"
       overlayClassName="z-40 bg-black/80 backdrop-blur-2xl p-2 sm:p-4"
-      cardClassName={`relative w-full max-w-5xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 rounded-3xl overflow-hidden z-10 flex flex-col shadow-2xl shadow-black/80 ${
-        isSeries ? 'details-series h-[92dvh] max-h-full' : 'max-h-full overflow-y-auto my-auto'
+      cardClassName={`details-modal-card relative w-full max-w-5xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 rounded-3xl overflow-hidden z-10 flex flex-col shadow-2xl shadow-black/80 ${
+        isSeries ? 'details-series h-[92dvh] max-h-full' : 'details-movie max-h-full overflow-y-auto my-auto'
       }`}
     >
         {/* Top Action Bar (Back Button) */}
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+        <div className="details-back-action absolute top-3 right-3 z-30 flex items-center gap-2">
           <button
             id="btn-details-back"
             onClick={onClose}
@@ -207,8 +219,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         {/* Hero Section with Backdrop & Cover Art */}
         {isSeries ? (
           /* ULTRA-COMPACT UPPER SECTION FOR TV SERIES (leaves full screen for episodes) */
-          <div className="relative shrink-0 p-3 sm:p-4 bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+          <div className="details-series-hero relative shrink-0 p-3 sm:p-4 bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="details-series-summary flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
               {/* Compact Cover Art */}
               <div className="w-16 sm:w-20 aspect-[2/3] shrink-0 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 relative shadow-md">
                 {coverArt ? (
@@ -228,7 +240,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
               </div>
 
               {/* Compact Title, Metadata, Synopsis, and Director/Cast */}
-              <div className="flex-1 min-w-0 pr-20 sm:pr-0">
+              <div className="details-series-info flex-1 min-w-0 pr-20 sm:pr-0">
                 <div className="flex flex-wrap items-center gap-1.5 mb-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">
                     TV Series
@@ -278,7 +290,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
             </div>
 
             {/* Quick Action Buttons for Series */}
-            <div className="flex flex-wrap items-center gap-2 shrink-0 pt-1 sm:pt-0">
+            <div className="details-series-actions flex flex-wrap items-center gap-2 shrink-0 pt-1 sm:pt-0">
               {/* Resume Last Episode */}
               {lastSeriesProgress && lastSeriesProgress.timestamp > 5 ? (
                 <button
@@ -367,8 +379,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
           </div>
         ) : (
           /* STANDARD FULL HERO SECTION FOR MOVIES (VOD) */
-          <div className="relative p-6 sm:p-8 flex flex-col md:flex-row gap-6 border-b border-slate-800">
-            <div className="w-44 sm:w-56 shrink-0 aspect-[2/3] rounded-xl overflow-hidden border border-slate-700 bg-slate-950 relative mx-auto md:mx-0">
+          <div className="details-movie-hero relative p-6 sm:p-8 flex flex-col md:flex-row gap-6 border-b border-slate-800">
+            <div className="details-movie-cover w-44 sm:w-56 shrink-0 aspect-[2/3] rounded-xl overflow-hidden border border-slate-700 bg-slate-950 relative mx-auto md:mx-0">
               {coverArt ? (
                 <img
                   src={coverArt}
@@ -390,7 +402,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
               )}
             </div>
 
-            <div className="flex-1 flex flex-col justify-between space-y-4">
+            <div className="details-movie-body flex-1 flex flex-col justify-between space-y-4">
               <div>
                 <div className="flex flex-wrap items-center gap-2 mb-2">
                   <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">
@@ -436,7 +448,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                   <div>
                     <span className="text-slate-400 font-semibold block mb-1.5">Cast Members:</span>
                     {castList.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto pr-1">
+                      <div className="details-cast-list flex flex-wrap gap-1.5 pr-1">
                         {castList.map((actor, idx) => (
                           <span
                             key={idx}
@@ -453,7 +465,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 pt-4">
+              <div className="details-movie-actions flex flex-wrap items-center gap-3 pt-4">
                 {progress && progress.timestamp > 5 && (
                   <button
                     id="btn-resume-playback"
@@ -532,10 +544,10 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
         {/* Series Section: Season Tabs & Episode Progress Tracker (ONLY SCROLLABLE AREA) */}
         {isSeries && (
-          <div className="p-3 sm:p-4 bg-slate-950 flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-2 shrink-0">
+          <div className="details-series-body p-3 sm:p-4 bg-slate-950 flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden">
+            <div className="details-season-toolbar flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-2 shrink-0">
               {/* Season Selection Tabs */}
-              <div className="flex items-center gap-2 overflow-x-auto">
+              <div className="details-season-tabs flex items-center gap-2 overflow-x-auto">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1.5">
                   <Layers className="w-4 h-4 text-sky-400" />
                   Seasons:
@@ -548,7 +560,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                       key={sNum}
                       id={`tab-season-${sNum}`}
                       onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-                      onClick={() => setSelectedSeason(sNum)}
+                      onClick={() => selectSeason(sNum)}
+                      aria-selected={isActive}
                       className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold tv-focus transition-all ${
                         isActive
                           ? 'bg-sky-500 text-white font-bold'
@@ -563,7 +576,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
               {/* Season Watched Progress Bar */}
               {seasonProgress && (
-                <div className="flex items-center gap-2.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                <div className="details-season-progress flex items-center gap-2.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
                   <span className="text-xs text-slate-300 font-medium">
                     Watched {seasonProgress.watchedCount} / {seasonProgress.total} episodes
                   </span>
@@ -583,7 +596,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
             {/* Episode Cards Grid - PURE SINGLE SCROLLABLE REGION */}
             <div
               id="episodes-scrollable-grid"
-              className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3 pr-2 content-start pb-4"
+              className="details-episode-grid flex-1 min-h-0 overflow-y-auto overflow-x-hidden grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 pr-2 content-start pb-4"
             >
               {currentEpisodes.map((episode) => {
                 const watched = isEpisodeWatched(
@@ -625,7 +638,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                         playThisEpisode();
                       }
                     }}
-                    className={`relative p-3 sm:p-3.5 rounded-xl border flex flex-col justify-between cursor-pointer min-h-[96px] sm:min-h-[104px] shrink-0 tv-focus transition-all group overflow-hidden ${
+                    className={`details-episode-card relative p-3 sm:p-3.5 rounded-xl border flex flex-col justify-between cursor-pointer min-h-[96px] sm:min-h-[104px] shrink-0 tv-focus transition-all group overflow-hidden ${
                       watched
                         ? 'bg-slate-900/60 border-slate-800 opacity-85 hover:border-emerald-500'
                         : 'bg-slate-900 border-slate-800 hover:border-sky-500 hover:bg-slate-850'
@@ -645,7 +658,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                       {/* Episode info */}
                       <div className="flex-1 min-w-0 pr-1">
                         <h4 className="text-xs sm:text-sm font-semibold text-slate-100 group-hover:text-sky-300 truncate">
-                          Episode {episode.episode_num}
+                          {episode.title?.trim() || `Episode ${episode.episode_num}`}
                         </h4>
 
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -675,7 +688,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                       </div>
 
                       {/* Actions: Play episode & Toggle Watched */}
-                      <div className="flex flex-col items-end justify-between gap-1.5 shrink-0 self-center">
+                      <div className="details-episode-actions flex flex-col items-end justify-between gap-1.5 shrink-0 self-center">
                         <div
                           id={`btn-play-ep-${episode.id}`}
                           className="p-1.5 rounded-lg bg-sky-500 text-white group-hover:bg-sky-400 shadow-md transition-colors"
@@ -696,7 +709,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                               episode.episode_num
                             );
                           }}
-                          className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-emerald-400 p-1 rounded hover:bg-slate-800 transition-colors cursor-pointer"
+                          className="details-watched-toggle flex items-center gap-1 text-[10px] text-slate-400 hover:text-emerald-400 p-1 rounded hover:bg-slate-800 transition-colors cursor-pointer"
                           title={watched ? 'Mark as unwatched' : 'Mark as watched'}
                         >
                           {watched ? (
