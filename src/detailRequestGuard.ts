@@ -8,16 +8,24 @@ type Entry<T> = {
 };
 
 const TTL_MS = 5 * 60 * 1000;
-const vodCache = new Map<number, Entry<VodDetails>>();
-const seriesCache = new Map<number, Entry<SeriesDetails>>();
+const vodCache = new Map<string, Entry<VodDetails>>();
+const seriesCache = new Map<string, Entry<SeriesDetails>>();
+
+function providerKey() {
+  const credentials = xtreamService.getCredentials();
+  const server = credentials?.server?.replace(/\/+$/, '') || 'demo';
+  const username = credentials?.username || 'anonymous';
+  return `${server}::${username}`;
+}
 
 function guarded<T>(
-  cache: Map<number, Entry<T>>,
+  cache: Map<string, Entry<T>>,
   id: number,
   loader: () => Promise<T | null>
 ): Promise<T | null> {
   const now = Date.now();
-  const current = cache.get(id);
+  const key = `${providerKey()}::${id}`;
+  const current = cache.get(key);
 
   if (current?.pending) return current.pending;
   if (current && current.expiresAt > now && 'value' in current) {
@@ -28,18 +36,18 @@ function guarded<T>(
     .then((value) => {
       // Cache successful detail payloads for a few minutes. Null/error fallbacks get a
       // short cooldown only so a temporary provider 429 does not become permanent.
-      cache.set(id, {
+      cache.set(key, {
         value,
         expiresAt: Date.now() + (value ? TTL_MS : 15_000),
       });
       return value;
     })
     .catch((error) => {
-      cache.set(id, { value: null, expiresAt: Date.now() + 15_000 });
+      cache.set(key, { value: null, expiresAt: Date.now() + 15_000 });
       throw error;
     });
 
-  cache.set(id, { pending, expiresAt: now + 15_000 });
+  cache.set(key, { pending, expiresAt: now + 15_000 });
   return pending;
 }
 
