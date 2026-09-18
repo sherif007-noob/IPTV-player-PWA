@@ -181,3 +181,8 @@ The last Pass 6 review identified and fixed two additional stale-data hazards:
 
 - Added the missing React `useRef` import required by the synchronous Continue Watching persistence ref.
 - `removeProgress` now accepts an optional content type so callers can remove one Live/VOD/Series identity without deleting another content type that shares the same numeric ID.
+
+
+### Continue Watching presentation consistency
+
+- Continue Watching counts now use the same title identity as the visible cards: multiple episode-progress records for one Series count as one Series title in the Home badge and section sidebar.
