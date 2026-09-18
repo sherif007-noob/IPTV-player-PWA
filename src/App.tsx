@@ -54,7 +54,7 @@ function readAppSessionState(): { view: MainNavView | 'home'; categoryId: string
     const raw = localStorage.getItem(APP_SESSION_KEY);
     if (!raw) return { view: 'home', categoryId: 'all' };
     const parsed = JSON.parse(raw);
-    const allowed = new Set(['home', 'live', 'vod', 'series', 'favorites', 'watchlist', 'continue_watching', 'settings']);
+    const allowed = new Set(['home', 'live', 'vod', 'series', 'favorites', 'watchlist', 'continue_watching']);
     return {
       view: allowed.has(parsed?.view) ? parsed.view : 'home',
       categoryId: typeof parsed?.categoryId === 'string' ? parsed.categoryId : 'all',
@@ -241,7 +241,7 @@ export default function App() {
         setIsDemo(xtreamService.getIsDemo());
 
         // Refresh categories and initial live stream catalog on startup
-        const [liveCats, vodCats, seriesCats, liveStreams] = await Promise.allSettled([
+        const [liveCats, , , liveStreams] = await Promise.allSettled([
           xtreamService.getCategories('live'),
           xtreamService.getCategories('vod'),
           xtreamService.getCategories('series'),
@@ -353,7 +353,7 @@ export default function App() {
     setRefreshNotice('Refreshing credentials & Xtream playlists...');
     try {
       xtreamService.clearCache();
-      invalidatePersistentCatalogs();
+      await invalidatePersistentCatalogs();
       await xtreamService.authenticate();
       setUserInfo(xtreamService.getUserInfo());
       setServerInfo(xtreamService.getServerInfo());
