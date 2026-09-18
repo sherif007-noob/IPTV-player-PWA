@@ -134,3 +134,47 @@ Media cards remain keyboard/remote-selectable while also containing Favorite/Wat
 - Enter/Space on the card opens/plays the card.
 - Favorite/Watchlist actions do not trigger card selection.
 - Remote/fine-pointer focus remains predictable.
+
+
+## Design-system regression
+
+Verify after every significant UI change:
+
+- Header visibly frosts content scrolling underneath it; it must not read as a flat opaque navy bar.
+- Scroll down hides the browser/touch header smoothly; scrolling up reveals it.
+- Near the top the header remains visible.
+- Header stays visible while its controls/search have focus and while the compact category drawer is open.
+- webOS/TV keeps the header visible.
+- Phone icon-only header controls are visually centered within 44px touch targets.
+- Floating surfaces use the semantic glass hierarchy; no accidental flat black/slate overlay appears.
+- Strong cyan is concentrated on focus, active state, primary actions, and playback progress.
+- Media-card hover moves the whole card (1.03 + slight lift); image zoom is secondary.
+- Touch press feedback does not leave a sticky hover state.
+- Keyboard/remote focus uses the consistent cyan outline + glow.
+- Details, Search, Settings, PWA guide, Exit dialog, Sidebar, and Player feel like the same product.
+- Reduced-motion mode removes nonessential transition motion.
+
+## Player OSD timing regression
+
+Run this after any player UI/state change:
+
+- Start playback and allow the OSD to auto-hide.
+- Single tap once: the OSD remains visible for approximately 3 seconds, not a fraction of a second.
+- Interact again before the deadline: a fresh full visibility window begins.
+- Double-tap seek cannot leave a stale timer that immediately hides the OSD.
+- Scrubbing keeps controls visible.
+- Pausing keeps controls visible.
+- Buffering/error state keeps controls visible.
+- Opening Episodes keeps controls visible.
+- Closing Episodes while playing returns to normal auto-hide behavior.
+
+The controls timer must retain one generation/deadline owner. Do not add a second independent auto-hide timer.
+
+## iOS reload/resume regression
+
+- Load a large Movies/Series catalog once, leave the section, then return; cached content should appear substantially faster.
+- Scroll deep into a library, background/lock the device, then return.
+- If iOS preserves the process, the UI should remain intact.
+- If iOS discards/reloads the page, stable section/category and saved scroll state should restore.
+- Playback progress must be flushed on background/pagehide so a killed page can resume near the last recorded position.
+- Do not expect the actual decoder/video element to survive an OS process kill.
