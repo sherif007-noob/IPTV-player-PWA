@@ -941,19 +941,9 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   .search-result-row:hover {
     background-color: rgba(15, 23, 42, 0.48);
   }
-  .home-portal-card:active,
-  .home-recent-card:active,
-  .stream-card:active {
-    transform: translateY(-2px) scale(0.99);
-  }
-  .home-portal-card:active img,
-  .home-recent-card:active img,
-  .stream-card:active img {
-    transform: scale(1.04);
-  }
 }
 
-/* Fine pointer users retain the hover affordances. */
+/* Fine pointer action hitboxes may remain visually compact. */
 @media (hover: hover) and (pointer: fine) {
   .stream-card-action {
     min-width: 0;
@@ -1347,44 +1337,6 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 }
 
 /* Fine pointers: card itself is the primary animated object. */
-@media (hover: hover) and (pointer: fine) {
-  .stream-card,
-  .home-portal-card,
-  .home-recent-card {
-    transform-origin: center;
-    transition:
-      transform 300ms ease-out,
-      border-color 300ms ease-out,
-      box-shadow 300ms ease-out,
-      background-color 300ms ease-out;
-  }
-  .stream-card:hover,
-  .home-portal-card:hover,
-  .home-recent-card:hover {
-    transform: translateY(-0.25rem) scale(1.03);
-  }
-  .stream-card img,
-  .home-recent-card img {
-    transition: transform 500ms ease-out;
-  }
-  .stream-card:hover img,
-  .stream-card:focus img,
-  .home-recent-card:hover img,
-  .home-recent-card:focus img {
-    transform: scale(1.08);
-  }
-}
-
-/* Touch gets press feedback, never sticky simulated hover. */
-@media (hover: none), (pointer: coarse) {
-  .stream-card:active,
-  .home-portal-card:active,
-  .home-recent-card:active {
-    transform: scale(0.985);
-    transition-duration: 120ms;
-  }
-}
-
 /* Scrubber thumb: reveal on hover/focus for fine pointers, always visible on touch. */
 @media (hover: hover) and (pointer: fine) {
   #video-player .player-seek-thumb {
