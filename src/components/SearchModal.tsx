@@ -73,15 +73,15 @@ export const SearchModal: React.FC<SearchModalProps> = ({
       overlayId="search-modal-backdrop"
       cardId="search-container-box"
       ariaLabel="Search library"
-      overlayClassName="z-50 bg-black/80 backdrop-blur-2xl flex-col items-center p-4 sm:p-8"
-      cardClassName="search-modal-card w-full max-w-4xl bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col max-h-[85dvh] shadow-2xl shadow-black/80"
+      overlayClassName="z-50 flex-col items-center p-4 sm:p-8"
+      cardClassName="search-modal-card w-full max-w-4xl rounded-3xl overflow-hidden flex flex-col max-h-[85dvh]"
     >
       <div
         className="search-modal-viewport flex min-h-0 w-full flex-col"
         style={visualViewportHeight ? { maxHeight: `${Math.max(280, visualViewportHeight - 24)}px` } : undefined}
       >
         {/* Search Input Bar */}
-        <div className="search-modal-inputbar p-4 sm:p-5 border-b border-white/10 flex items-center gap-3 bg-slate-950/70 backdrop-blur-md">
+        <div className="search-modal-inputbar glass-surface p-4 sm:p-5 border-b border-white/10 flex items-center gap-3">
           <Search className="w-5 h-5 text-sky-400 shrink-0 drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
           <input
             ref={inputRef}
@@ -107,14 +107,14 @@ export const SearchModal: React.FC<SearchModalProps> = ({
           <button
             id="btn-close-search"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 tv-focus ml-2"
+            className="glass-control px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white tv-focus ml-2"
           >
             Close [ESC]
           </button>
         </div>
 
         {/* Filter Type Pills */}
-        <div className="search-modal-filters px-5 py-3 border-b border-slate-800 flex items-center gap-2 overflow-x-auto bg-slate-900" role="tablist" aria-label="Search content type">
+        <div className="search-modal-filters search-glass-strip px-5 py-3 border-b border-white/10 flex items-center gap-2 overflow-x-auto" role="tablist" aria-label="Search content type">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-2">
             Filter:
           </span>
@@ -166,7 +166,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                   onSelectItem(item);
                   onClose();
                 }}
-                className="search-result-row p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500 hover:bg-slate-900 cursor-pointer flex items-center justify-between gap-4 tv-focus group"
+                className="search-result-row glass-control p-3 rounded-xl hover:border-sky-500 cursor-pointer flex items-center justify-between gap-4 tv-focus group transition-all duration-200"
               >
                 <div className="flex items-center gap-3.5">
                   <div className="w-12 h-12 rounded-lg bg-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
