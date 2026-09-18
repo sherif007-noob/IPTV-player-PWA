@@ -138,9 +138,24 @@ video {
 }
 #video-player button, #video-player select { min-width: 44px; min-height: 44px; }
 #video-player .seek-slider:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
-#details-modal-overlay, #search-modal-backdrop, #server-login-modal-overlay {
+.modal-shell {
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
   height: 100dvh;
-  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  padding:
+    max(12px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+}
+.modal-shell-card {
+  max-width: calc(100dvw - max(24px, env(safe-area-inset-left) + env(safe-area-inset-right)));
+  max-height: calc(100dvh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+}
+html.modal-open,
+html.modal-open body {
+  overscroll-behavior: none;
 }
 #server-login-card { max-height: 100%; overflow-y: auto; display: block; }
 #search-container-box { max-height: 100%; min-height: 0; }
@@ -172,6 +187,43 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     flex-wrap: wrap;
   }
 }
+@media (max-width: 640px) {
+  .modal-shell {
+    align-items: stretch;
+    padding:
+      max(8px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+  }
+  .modal-shell-card {
+    width: 100%;
+    max-width: none;
+    max-height: 100%;
+    border-radius: 20px;
+  }
+  #search-container-box,
+  #server-login-card {
+    height: 100%;
+  }
+  #exit-confirm-card {
+    height: auto;
+    margin: auto 0;
+  }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .modal-shell {
+    padding:
+      max(6px, env(safe-area-inset-top))
+      max(10px, env(safe-area-inset-right))
+      max(6px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));
+  }
+  #exit-confirm-card {
+    max-width: 34rem;
+  }
+}
+
 @media (max-width: 640px), (max-height: 500px) {
   #details-card-container.details-series { overflow-y: auto; display: block; }
   #details-card-container.details-series > :last-child { overflow: visible; }
