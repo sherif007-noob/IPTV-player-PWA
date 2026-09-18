@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
 
+let openDialogCount = 0;
+let previousBodyOverflow = '';
+
+
 /** Keep keyboard focus and scrolling inside the topmost open dialog. */
 export function useDialog(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -10,8 +14,12 @@ export function useDialog(open: boolean, onClose: () => void) {
     if (!open || !ref.current) return;
     const dialog: HTMLDivElement = ref.current;
     const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (openDialogCount === 0) {
+      previousBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.classList.add('modal-open');
+    }
+    openDialogCount += 1;
     const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>(
       'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]'
     )).filter((element) => element.getClientRects().length && !element.closest('[inert]'));
@@ -45,7 +53,11 @@ export function useDialog(open: boolean, onClose: () => void) {
     return () => {
       window.removeEventListener('keydown', onKey, true);
       document.removeEventListener('focusin', onFocus);
-      document.body.style.overflow = overflow;
+      openDialogCount = Math.max(0, openDialogCount - 1);
+      if (openDialogCount === 0) {
+        document.body.style.overflow = previousBodyOverflow;
+        document.documentElement.classList.remove('modal-open');
+      }
       if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
   }, [open]);
