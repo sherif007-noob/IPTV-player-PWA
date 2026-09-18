@@ -107,13 +107,19 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
             }}
             title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             aria-pressed={isFavorite}
-            className={`stream-card-action p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
+            className={`stream-card-action rounded-xl transition-all duration-200 ${
               isFavorite
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/40'
                 : 'bg-slate-950/70 border border-white/10 text-slate-300 hover:text-amber-400 hover:bg-slate-900/90'
             }`}
           >
-            <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current' : ''}`} />
+            <span className={`stream-card-action-visual p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
+              isFavorite
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/40'
+                : 'bg-slate-950/70 border border-white/10 text-slate-300'
+            }`}>
+              <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current' : ''}`} />
+            </span>
           </button>
 
           {!isLive && onToggleWatchlist && (
@@ -131,7 +137,13 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
                   : 'bg-slate-950/70 border border-white/10 text-slate-300 hover:text-sky-400 hover:bg-slate-900/90'
               }`}
             >
-              <Bookmark className={`w-3.5 h-3.5 ${isInWatchlist ? 'fill-current' : ''}`} />
+              <span className={`stream-card-action-visual p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
+                isInWatchlist
+                  ? 'bg-sky-500 text-white shadow-md shadow-sky-500/40'
+                  : 'bg-slate-950/70 border border-white/10 text-slate-300'
+              }`}>
+                <Bookmark className={`w-3.5 h-3.5 ${isInWatchlist ? 'fill-current' : ''}`} />
+              </span>
             </button>
           )}
         </div>
