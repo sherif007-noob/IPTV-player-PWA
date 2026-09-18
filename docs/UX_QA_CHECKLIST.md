@@ -242,3 +242,9 @@ The controls timer must retain one generation/deadline owner. Do not add a secon
 - Open VOD/Series details on provider/account A, switch credentials to provider/account B, then open the same numeric content ID. Provider B must not receive provider A's cached detail payload.
 - Start a large catalog request, trigger manual Refresh before it completes, and allow the old request to finish. The pre-refresh result must not repopulate IndexedDB after persistent invalidation.
 - Navigation-only memory release may still allow a useful late catalog result to persist to IndexedDB, but it must not repopulate released hot/service RAM.
+
+
+## In-flight dedupe regression
+
+- Start catalog request A, invalidate/refresh, then immediately start request B for the same provider/category key before A settles. When A finishes, B must remain registered as the active dedupe Promise; a third caller must join B rather than starting request C.
+- Open many different title details across a long session and provider switches; expired detail entries should be pruned rather than growing the detail cache without bound.
