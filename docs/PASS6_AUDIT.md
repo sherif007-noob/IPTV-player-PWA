@@ -196,3 +196,8 @@ The last Pass 6 review identified and fixed two additional stale-data hazards:
 
 
 - Provider transition now clears React Live/category state as well as VOD/Series. Home immediately reloads the new provider's Live categories/count source; special lists reload only lightweight categories.
+
+
+## Remaining architectural limitation
+
+- Favorites/Watchlist/Continue Watching storage remains account-global localStorage rather than provider-scoped storage. Catalog/detail/network caches are provider-isolated, but switching Xtream providers can still leave user-curated entries from the previous provider visible until cleared. A provider-scoped user-state migration should be treated as a separate future data-migration feature rather than introduced late in this UX/cache hardening pass.
