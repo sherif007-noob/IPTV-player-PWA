@@ -186,3 +186,10 @@ The last Pass 6 review identified and fixed two additional stale-data hazards:
 ### Continue Watching presentation consistency
 
 - Continue Watching counts now use the same title identity as the visible cards: multiple episode-progress records for one Series count as one Series title in the Home badge and section sidebar.
+
+
+### Provider-switch request isolation
+
+- Categories and Live requests now capture provider identity before awaiting the underlying Xtream service. If credentials change before the request resolves, the result is rejected and the unscoped service cache is cleared.
+- VOD/Series wrapper reads perform the same provider-identity checks after asynchronous IndexedDB/network boundaries.
+- Successful Settings/Demo provider transitions invalidate active request generations, clear heavy React arrays/hot/service/persistent catalogs, reset provider-scoped counts, and reload only the active non-special section.
