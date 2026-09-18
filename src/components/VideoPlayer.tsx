@@ -290,6 +290,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const playbackCounterRef = useRef(0);
   const seekCursorRef = useRef(Math.max(0, initialTime));
   const pendingSeekRef = useRef<{ target: number; resume: boolean } | null>(null);
+  const seekRestartTimerRef = useRef<number | null>(null);
 
   const [activeUrl, setActiveUrl] = useState('');
   const [isPlaying, setIsPlaying] = useState(true);
@@ -361,12 +362,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [activeUrl, metadataDuration]);
 
   useEffect(() => {
-    const next = buildPlaybackUrl(streamUrl);
-    initialNativeSeekRef.current = Math.max(0, initialTime);
+    const generated = usesGeneratedHls(streamUrl);
+    const next = buildPlaybackUrl(streamUrl, generated && initialTime > 0 ? initialTime : undefined);
+    initialNativeSeekRef.current = generated ? 0 : Math.max(0, initialTime);
     resumeAfterSourceChangeRef.current = true;
     setActiveUrl(next);
     seekCursorRef.current = Math.max(0, initialTime);
     pendingSeekRef.current = null;
+    if (seekRestartTimerRef.current !== null) {
+      window.clearTimeout(seekRestartTimerRef.current);
+      seekRestartTimerRef.current = null;
+    }
     setCurrentTime(0);
     setBuffered(0);
     setDuration(getKnownDuration(item, seriesContext));
@@ -478,7 +484,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!video) return currentTime;
     const raw = Number(video.currentTime);
     if (!Number.isFinite(raw)) return currentTime;
-    return raw;
+    return usesGeneratedHls(activeUrl) ? getSourceStart(activeUrl) + raw : raw;
   }, [activeUrl, currentTime]);
 
   const recordProgress = useCallback(() => {
@@ -539,29 +545,60 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const upper = duration > 0 ? duration : Number.MAX_SAFE_INTEGER;
     const target = Math.max(0, Math.min(upper, requestedSeconds));
     const wasPlaying = !video.paused;
+    const generated = usesGeneratedHls(activeUrl);
+    const sourceStart = generated ? getSourceStart(activeUrl) : 0;
 
     seekCursorRef.current = target;
 
+    const seekableStart = video.seekable.length
+      ? sourceStart + video.seekable.start(0)
+      : sourceStart;
     const seekableEnd = video.seekable.length
-      ? video.seekable.end(video.seekable.length - 1)
-      : 0;
+      ? sourceStart + video.seekable.end(video.seekable.length - 1)
+      : sourceStart;
 
-    if (usesGeneratedHls(activeUrl) && target > seekableEnd + 0.5) {
+    if (generated && (target < seekableStart - 0.5 || target > seekableEnd + 0.5)) {
       pendingSeekRef.current = { target, resume: wasPlaying };
-      setSeekFeedback(`Preparing ${formatTime(target)} · available to ${formatTime(seekableEnd)}`);
+      setSeekFeedback(`Jumping to ${formatTime(target)}...`);
+
+      if (seekRestartTimerRef.current !== null) {
+        window.clearTimeout(seekRestartTimerRef.current);
+      }
+
+      seekRestartTimerRef.current = window.setTimeout(() => {
+        seekRestartTimerRef.current = null;
+        const pending = pendingSeekRef.current;
+        if (!pending) return;
+
+        pendingSeekRef.current = null;
+        resumeAfterSourceChangeRef.current = pending.resume;
+        const nextUrl = buildPlaybackUrl(activeUrl, pending.target);
+        setCurrentTime(pending.target);
+        setBuffered(pending.target);
+        setIsBuffering(true);
+        setPlaybackError(null);
+        setActiveUrl(nextUrl);
+        console.log(`Instant HLS source switch: target=${Math.floor(pending.target)}s url=${nextUrl}`);
+      }, 140);
+
       return false;
     }
 
     pendingSeekRef.current = null;
+    if (seekRestartTimerRef.current !== null) {
+      window.clearTimeout(seekRestartTimerRef.current);
+      seekRestartTimerRef.current = null;
+    }
+
     try {
-      video.currentTime = target;
+      video.currentTime = generated ? Math.max(0, target - sourceStart) : target;
       setCurrentTime(target);
       if (wasPlaying) safePlay();
       return true;
     } catch {
       return false;
     }
-  }, [activeUrl, duration, isLive, safePlay]);
+  }, [activeUrl, buildPlaybackUrl, duration, isLive, safePlay]);
 
   const handleSeek = useCallback((delta: number) => {
     const video = videoRef.current;
@@ -596,6 +633,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [recordProgress, safePause, safePlay]);
 
   const closePlayer = useCallback(() => {
+    if (seekRestartTimerRef.current !== null) {
+      window.clearTimeout(seekRestartTimerRef.current);
+      seekRestartTimerRef.current = null;
+    }
+    pendingSeekRef.current = null;
     progressRef.current();
     stopPlaybackUrl(activeUrl);
     if (hlsRef.current) {
@@ -612,40 +654,27 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const raw = Number(video.currentTime);
     if (!Number.isFinite(raw)) return;
 
-    const absolute = raw;
+    const sourceStart = usesGeneratedHls(activeUrl) ? getSourceStart(activeUrl) : 0;
+    const absolute = sourceStart + raw;
     setCurrentTime(absolute);
 
-    let seekableEnd = 0;
+    let seekableEnd = sourceStart;
     if (video.seekable.length > 0) {
-      seekableEnd = video.seekable.end(video.seekable.length - 1);
+      seekableEnd = sourceStart + video.seekable.end(video.seekable.length - 1);
       setBuffered(seekableEnd);
     } else if (video.buffered.length > 0) {
-      seekableEnd = video.buffered.end(video.buffered.length - 1);
+      seekableEnd = sourceStart + video.buffered.end(video.buffered.length - 1);
       setBuffered(seekableEnd);
     }
 
-    const pendingSeek = pendingSeekRef.current;
-    if (pendingSeek && seekableEnd > 0) {
-      if (pendingSeek.target <= seekableEnd + 0.5) {
-        pendingSeekRef.current = null;
-        seekCursorRef.current = pendingSeek.target;
-        try { video.currentTime = pendingSeek.target; } catch {}
-        setCurrentTime(pendingSeek.target);
-        setSeekFeedback(`Jumped to ${formatTime(pendingSeek.target)}`);
-        window.setTimeout(() => setSeekFeedback(null), 900);
-        if (pendingSeek.resume) safePlay();
-      } else {
-        setSeekFeedback(
-          `Preparing ${formatTime(pendingSeek.target)} · available to ${formatTime(seekableEnd)}`
-        );
-      }
-    } else if (!pendingSeek) {
+    if (!pendingSeekRef.current) {
       seekCursorRef.current = absolute;
     }
 
-    if (initialNativeSeekRef.current > 0 && seekableEnd > 0) {
+    if (initialNativeSeekRef.current > 0 && video.seekable.length > 0) {
       const target = initialNativeSeekRef.current;
-      if (target <= seekableEnd + 0.5) {
+      const nativeSeekableEnd = video.seekable.end(video.seekable.length - 1);
+      if (target <= nativeSeekableEnd + 0.5) {
         initialNativeSeekRef.current = 0;
         seekCursorRef.current = target;
         try { video.currentTime = target; } catch {}
@@ -653,8 +682,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
 
     updateDurationFromMedia();
-    if (absolute > 0.05) setIsBuffering(false);
-  }, [activeUrl, safePlay, updateDurationFromMedia]);
+    if (raw > 0.05) setIsBuffering(false);
+  }, [activeUrl, updateDurationFromMedia]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
