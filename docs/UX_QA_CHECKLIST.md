@@ -14,6 +14,23 @@ npm run build
 
 If a lockfile is later committed, prefer `npm ci` instead of `npm install`.
 
+## Manual UX harness
+
+While the dev server is running, use the dedicated harness page to isolate responsive components:
+
+```text
+/tests/ux/index.html?mode=home
+/tests/ux/index.html?mode=header
+/tests/ux/index.html?mode=card
+/tests/ux/index.html?mode=search
+/tests/ux/index.html?mode=details
+/tests/ux/index.html?mode=series
+/tests/ux/index.html?mode=settings
+/tests/ux/index.html?mode=player
+```
+
+Use browser responsive mode for quick layout checks, then repeat the final gate on real iPhone/iPad hardware because Safari visualViewport, native HLS, safe areas, and touch gestures cannot be fully validated by desktop emulation.
+
 ## iPhone
 
 Test Safari and the installed PWA where available.
