@@ -97,7 +97,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
     <header
       id="app-top-header"
       aria-label="Primary navigation"
-      className="app-header h-16 px-3 sm:px-6 bg-slate-950/85 backdrop-blur-xl border-b border-white/10 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0 select-none shadow-lg shadow-black/40"
+      className="app-header h-16 px-3 sm:px-6 bg-slate-950/58 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0 select-none shadow-lg shadow-black/35"
     >
       {/* Brand & Home Navigation */}
       <div className="app-header-primary flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -242,7 +242,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           onClick={onRefresh}
           disabled={isRefreshing}
           title="Refresh credentials & Xtream content"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-semibold disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/58 backdrop-blur-md hover:bg-slate-800/75 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold disabled:opacity-50 tv-focus transition-all duration-200"
         >
           <RefreshCw
             className={`w-3.5 h-3.5 text-sky-400 ${isRefreshing ? 'animate-spin' : ''}`}
@@ -265,7 +265,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
             aria-expanded={isFontMenuOpen}
             aria-controls="font-size-dropdown-menu"
             title="TV Screen Font Scale & Readability"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-semibold"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/58 backdrop-blur-md hover:bg-slate-800/75 text-slate-200 border border-white/10 text-xs font-semibold tv-focus transition-all duration-200"
           >
             <Type className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             <span className="text-xs font-medium text-sky-300 font-sans">
@@ -278,7 +278,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
             <div
               id="font-size-dropdown-menu"
               role="menu"
-              className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col space-y-1"
+              className="absolute right-0 mt-2 w-56 bg-slate-900/72 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col space-y-1"
             >
               <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 TV Screen UI Scale
@@ -318,7 +318,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           data-skip-spatial="true"
           onClick={onOpenSettings}
           title="Configure Xtream Codes Server"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-semibold"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/58 backdrop-blur-md hover:bg-slate-800/75 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold tv-focus transition-all duration-200"
         >
           <Settings className="w-3.5 h-3.5 text-indigo-400" />
           <span className="hidden md:inline">Settings</span>
