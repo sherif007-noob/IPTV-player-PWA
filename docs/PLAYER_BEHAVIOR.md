@@ -88,7 +88,7 @@ Series playback may expose the episode drawer. Selecting an episode switches pla
 
 ## Progress persistence
 
-Playback progress is recorded periodically and is also flushed when the document becomes hidden or the page receives `pagehide`. This is important on iOS because Safari may discard the page process while backgrounded.
+Playback progress is recorded periodically and is also flushed when the document becomes hidden or the page receives `pagehide`. The storage hook writes the updated progress payload to localStorage synchronously as part of the progress mutation, rather than depending only on a later React effect. This is important on iOS because Safari may discard the page process while backgrounded.
 
 A full iOS process kill cannot preserve the decoder/video element. The application restores persisted progress rather than pretending the media session survived.
 
