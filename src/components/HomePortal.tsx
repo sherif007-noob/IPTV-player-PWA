@@ -19,6 +19,7 @@ interface HomePortalProps {
   continueWatchingList?: PlaybackProgress[];
   onResumeRecent?: (progress: PlaybackProgress) => void;
   onClearContinueWatching?: () => void;
+  onScrollPositionChange?: (scrollTop: number) => void;
 }
 
 export const HomePortal: React.FC<HomePortalProps> = ({
@@ -29,6 +30,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
   continueWatchingList = [],
   onResumeRecent,
   onClearContinueWatching,
+  onScrollPositionChange,
 }) => {
   // Take the top 3 most recent continue watching titles
   const recentThree = continueWatchingList.slice(0, 3);
@@ -36,7 +38,8 @@ export const HomePortal: React.FC<HomePortalProps> = ({
   return (
     <div
       id="home-portal-dashboard"
-      className="home-portal flex-1 overflow-y-auto p-6 sm:p-10 max-w-7xl mx-auto w-full flex flex-col justify-start space-y-8 select-none"
+      onScroll={(event) => onScrollPositionChange?.(event.currentTarget.scrollTop)}
+      className="home-portal header-underlay-scroll flex-1 overflow-y-auto p-6 sm:p-10 max-w-7xl mx-auto w-full flex flex-col justify-start space-y-8 select-none"
     >
       {/* Primary 3 Pillars: Live TV, Movies, and TV Series Cards */}
       <section>
