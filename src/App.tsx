@@ -1252,7 +1252,7 @@ export default function App() {
                         <button
                           id="btn-load-more-titles"
                           onClick={() => setVisibleCount((prev) => Math.min(prev + 48, currentGridItems.length))}
-                          className="px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 tv-focus transition-all flex items-center gap-2 shadow-lg hover:border-sky-500/50"
+                          className="glass-control px-6 py-2.5 rounded-xl hover:bg-slate-700/65 text-slate-200 text-xs font-semibold tv-focus transition-all flex items-center gap-2 hover:border-sky-500/50"
                         >
                           <RefreshCw className="w-3.5 h-3.5 text-sky-400" />
                           <span>Load More Titles (+48)</span>
@@ -1355,8 +1355,8 @@ export default function App() {
         overlayId="exit-confirm-modal"
         cardId="exit-confirm-card"
         ariaLabel="Exit application confirmation"
-        overlayClassName="z-50 bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
-        cardClassName="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl p-6 shadow-2xl space-y-5 text-center"
+        overlayClassName="z-50 p-4 animate-in fade-in duration-200"
+        cardClassName="exit-confirm-card w-full max-w-md rounded-2xl p-6 space-y-5 text-center"
       >
         <div className="w-14 h-14 mx-auto rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shadow-lg shadow-red-500/10">
           <LogOut className="w-7 h-7" />
@@ -1377,7 +1377,7 @@ export default function App() {
             id="btn-exit-cancel"
             autoFocus
             onClick={() => setShowExitConfirm(false)}
-            className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold border border-slate-700 transition-all tv-focus"
+            className="glass-control flex-1 py-3 px-4 rounded-xl hover:bg-slate-700/65 text-slate-200 text-sm font-semibold transition-all tv-focus"
           >
             Cancel [Stay]
           </button>
