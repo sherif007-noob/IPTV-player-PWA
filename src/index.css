@@ -550,6 +550,278 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 }
 
 
+
+/* Browse surface: Home, cards, search, and library chrome. */
+.home-portal-primary,
+.home-portal-recent-grid {
+  align-items: stretch;
+}
+.stream-card-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.search-modal-viewport {
+  max-height: inherit;
+}
+.search-modal-filters {
+  scroll-snap-type: x proximity;
+}
+.search-modal-filters > button {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+}
+.search-result-row > :first-child {
+  min-width: 0;
+}
+
+/* Phones: compact Home cards and a denser browse surface without changing the visual language. */
+@media (max-width: 640px) {
+  .home-portal {
+    padding: 14px 12px max(18px, env(safe-area-inset-bottom));
+    gap: 18px;
+  }
+  .home-portal-primary {
+    gap: 10px;
+  }
+  .home-portal-card {
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 14px 16px !important;
+    border-radius: 20px;
+    display: grid !important;
+    grid-template-columns: 56px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 14px;
+    row-gap: 4px;
+    text-align: left;
+    justify-items: start;
+  }
+  .home-portal-card > div:nth-of-type(2) {
+    grid-row: 1 / 3;
+    grid-column: 1;
+    width: 56px;
+    height: 56px;
+    margin: 0;
+    border-radius: 18px;
+  }
+  .home-portal-card > div:nth-of-type(2) svg {
+    width: 28px;
+    height: 28px;
+  }
+  .home-portal-card > h3 {
+    grid-column: 2;
+    margin: 0;
+    font-size: 1.1rem;
+    line-height: 1.2;
+    align-self: end;
+  }
+  .home-portal-card > div:last-child {
+    grid-column: 2;
+    margin: 0;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .home-portal-card > div:first-child {
+    display: none;
+  }
+
+  .home-portal-recent {
+    gap: 10px;
+  }
+  .home-portal-recent > div:first-child {
+    gap: 8px;
+    align-items: flex-start;
+  }
+  .home-portal-recent > div:first-child > div:first-child {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+  #btn-clear-portal-continue {
+    padding-inline: 10px;
+  }
+  #btn-clear-portal-continue span {
+    display: none;
+  }
+  .home-portal-recent-grid {
+    gap: 10px;
+  }
+  .home-recent-card {
+    padding: 12px !important;
+    min-height: 106px;
+  }
+  .home-recent-resume {
+    min-height: 40px;
+  }
+
+  .library-subheader {
+    align-items: flex-start;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  .library-breadcrumb {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .library-breadcrumb > span {
+    min-width: 0;
+  }
+  .library-breadcrumb > span:last-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .library-subheader-actions {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  #btn-clear-active-special {
+    min-height: 40px;
+    padding-inline: 10px;
+  }
+
+  .search-modal-inputbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 10px 12px;
+  }
+  .search-modal-inputbar > svg {
+    display: none;
+  }
+  .search-modal-inputbar #btn-close-search {
+    margin-left: 0;
+    padding-inline: 10px;
+    white-space: nowrap;
+  }
+  .search-modal-filters {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .search-modal-filters > span:first-child {
+    display: none;
+  }
+  .search-modal-filters > span:last-child {
+    flex: 0 0 auto;
+    margin-left: 4px;
+  }
+  .search-modal-results {
+    padding: 10px;
+  }
+  .search-result-row {
+    min-height: 72px;
+    padding: 10px;
+    gap: 10px;
+  }
+  .search-result-row > :first-child {
+    gap: 10px;
+  }
+  .search-result-row > :first-child > :first-child {
+    width: 46px;
+    height: 56px;
+  }
+  .search-result-row > :last-child {
+    display: none;
+  }
+  .search-result-row span.text-sm {
+    display: -webkit-box;
+    white-space: normal;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* iPad / medium widths: Home becomes a balanced touch-first grid. */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .home-portal {
+    padding: 24px;
+    gap: 24px;
+  }
+  .home-portal-primary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .home-portal-card {
+    height: 210px !important;
+    padding: 22px !important;
+  }
+  .home-portal-card > div:nth-of-type(2) {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 14px;
+  }
+  .home-portal-card > h3 {
+    font-size: 1.35rem;
+  }
+  .home-portal-recent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+/* Touch: keep icon visuals compact while enlarging the interactive area. */
+@media (hover: none), (pointer: coarse) {
+  .stream-card {
+    transform: none !important;
+  }
+  .stream-card-actions {
+    opacity: 1;
+    gap: 4px;
+  }
+  .stream-card-action {
+    width: 44px;
+    height: 44px;
+    padding: 0 !important;
+    background-clip: padding-box;
+  }
+  .stream-card-action svg {
+    width: 15px;
+    height: 15px;
+  }
+  .stream-card-play-overlay {
+    display: none;
+  }
+  .stream-card img,
+  .home-portal-card,
+  .home-recent-card img {
+    transform: none !important;
+  }
+  .stream-card-title {
+    -webkit-line-clamp: 2;
+    line-height: 1.25;
+  }
+  .home-portal-card:hover,
+  .home-recent-card:hover,
+  .stream-card:hover {
+    transform: none !important;
+  }
+  .search-result-row:hover {
+    background-color: rgb(2 6 23);
+  }
+}
+
+/* Fine pointer users retain the hover affordances. */
+@media (hover: hover) and (pointer: fine) {
+  .stream-card-action {
+    min-width: 0;
+    min-height: 0;
+  }
+}
+
+/* iOS software keyboard: search card follows visualViewport and avoids nested page scroll. */
+@supports (-webkit-touch-callout: none) {
+  .search-modal-card {
+    overflow: hidden;
+  }
+  .search-modal-results {
+    overscroll-behavior-y: contain;
+  }
+}
+
 /* Width-driven library grids avoid device-specific breakpoint assumptions. */
 .content-card-grid {
   grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
