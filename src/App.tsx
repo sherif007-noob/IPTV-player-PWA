@@ -31,7 +31,7 @@ import {
   TvFontSize,
 } from './types';
 import { xtreamService } from './services/xtream';
-import { invalidatePersistentCatalogs } from './catalogPersistence';
+import { invalidatePersistentCatalogs, releaseCatalogMemory } from './catalogPersistence';
 import { useStorage } from './hooks/useStorage';
 import { useWebOSRemote } from './hooks/useWebOSRemote';
 import { AppHeader } from './components/AppHeader';
@@ -112,6 +112,7 @@ export default function App() {
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const fullCatalogLoadedRef = useRef({ vod: false, series: false });
   const homeSearchOwnedCatalogsRef = useRef({ vod: false, series: false });
+  const loadRequestIdRef = useRef(0);
 
   const [isCompactNavigation, setIsCompactNavigation] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -258,6 +259,8 @@ export default function App() {
       if (view === 'home' || view === 'favorites' || view === 'watchlist' || view === 'continue_watching') {
         return;
       }
+
+      const requestId = ++loadRequestIdRef.current;
       setIsLoadingContent(true);
       const isAll = catId === 'all' || catId.startsWith('special_');
       const viewLabel = view === 'vod' ? 'Movies (VOD)' : view === 'series' ? 'TV Series' : 'Live Channels';
@@ -267,39 +270,45 @@ export default function App() {
           : `Filtering category in ${viewLabel}...`
       );
 
+      const isCurrentRequest = () => requestId === loadRequestIdRef.current;
+
       try {
         if (view === 'live') {
           const categoriesPromise = xtreamService.getCategories('live')
-            .then(setCategories)
+            .then((cats) => { if (isCurrentRequest()) setCategories(cats); })
             .catch((error) => console.warn('Live category refresh notice:', error));
           const streams = await xtreamService.getLiveStreams(catId);
+          if (!isCurrentRequest()) return;
           setLiveChannels(streams);
           setIsLoadingContent(false);
           await categoriesPromise;
         } else if (view === 'vod') {
           const categoriesPromise = xtreamService.getCategories('vod')
-            .then(setCategories)
+            .then((cats) => { if (isCurrentRequest()) setCategories(cats); })
             .catch((error) => console.warn('VOD category refresh notice:', error));
           const vodList = await xtreamService.getVodStreams(catId);
+          if (!isCurrentRequest()) return;
           fullCatalogLoadedRef.current.vod = catId === 'all';
           setMovies(vodList);
           setIsLoadingContent(false);
           await categoriesPromise;
         } else if (view === 'series') {
           const categoriesPromise = xtreamService.getCategories('series')
-            .then(setCategories)
+            .then((cats) => { if (isCurrentRequest()) setCategories(cats); })
             .catch((error) => console.warn('Series category refresh notice:', error));
           const sList = await xtreamService.getSeries(catId);
+          if (!isCurrentRequest()) return;
           fullCatalogLoadedRef.current.series = catId === 'all';
           setSeries(sList);
           setIsLoadingContent(false);
           await categoriesPromise;
         }
       } catch (err: any) {
+        if (!isCurrentRequest()) return;
         console.error('Error loading content:', err);
         setRefreshNotice(`Error: ${err.message || 'Failed to load library'}`);
       } finally {
-        setIsLoadingContent(false);
+        if (isCurrentRequest()) setIsLoadingContent(false);
       }
     },
     []
@@ -316,11 +325,10 @@ export default function App() {
         setCredentials(xtreamService.getCredentials());
         setIsDemo(xtreamService.getIsDemo());
 
-        // Refresh categories and initial live stream catalog on startup
-        const [liveCats, , , liveStreams] = await Promise.allSettled([
+        // Startup stays intentionally light: Live powers Home immediately;
+        // VOD/Series categories and catalogs remain on-demand.
+        const [liveCats, liveStreams] = await Promise.allSettled([
           xtreamService.getCategories('live'),
-          xtreamService.getCategories('vod'),
-          xtreamService.getCategories('series'),
           xtreamService.getLiveStreams('all'),
         ]);
 
@@ -396,8 +404,14 @@ export default function App() {
   };
 
   const handleNavigateHome = () => {
+    loadRequestIdRef.current += 1;
     setViewHistory((prev) => (prev[prev.length - 1] === 'home' ? prev : [...prev, 'home']));
     setCurrentView('home');
+    setMovies([]);
+    setSeries([]);
+    fullCatalogLoadedRef.current = { vod: false, series: false };
+    homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
+    releaseCatalogMemory();
     if (isCompactNavigation) setIsSidebarOpen(false);
     setSelectedCategoryId('all');
     setHeaderSearchQuery('');
@@ -421,6 +435,7 @@ export default function App() {
     if (isCompactNavigation) setIsSidebarOpen(false);
 
     if (catId.startsWith('special_')) {
+      loadRequestIdRef.current += 1;
       // Special lists are rendered directly from persisted user state. Release
       // large VOD/Series arrays instead of keeping an unnecessary full catalog in RAM.
       if (currentView === 'vod') {
@@ -534,7 +549,11 @@ export default function App() {
       }
 
       await Promise.allSettled(tasks);
-      if (!cancelled) setRefreshNotice(null);
+      if (cancelled) {
+        releaseCatalogMemory();
+        return;
+      }
+      setRefreshNotice(null);
     };
 
     void loadMissingSearchCatalogs();
@@ -656,9 +675,15 @@ export default function App() {
     // 7. Return to Home starting portal if inside a section.
     // Reset stale section history so the next Back is meaningful.
     if (currentView !== 'home') {
+      loadRequestIdRef.current += 1;
       setCurrentView('home');
       setSelectedCategoryId('all');
       setHeaderSearchQuery('');
+      setMovies([]);
+      setSeries([]);
+      fullCatalogLoadedRef.current = { vod: false, series: false };
+      homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
+      releaseCatalogMemory();
       setViewHistory(['home']);
       return;
     }
