@@ -43,6 +43,7 @@ import { ServerLoginModal } from './components/ServerLoginModal';
 import { RemoteControlHUD } from './components/RemoteControlHUD';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { ModalShell } from './components/ModalShell';
+import { useDialog } from './hooks/useDialog';
 
 export default function App() {
   const storage = useStorage();
@@ -92,6 +93,11 @@ export default function App() {
     media.addEventListener?.('change', syncNavigationMode);
     return () => media.removeEventListener?.('change', syncNavigationMode);
   }, []);
+
+  const sidebarDialogRef = useDialog(
+    isCompactNavigation && isSidebarOpen,
+    () => setIsSidebarOpen(false)
+  );
 
   // Search state (Header searchbar)
   const [headerSearchQuery, setHeaderSearchQuery] = useState<string>('');
@@ -457,18 +463,6 @@ export default function App() {
 
   backNavigationRef.current = handleBackNavigation;
 
-  useEffect(() => {
-    if (!isCompactNavigation || !isSidebarOpen) return;
-    const handleDrawerKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      event.stopPropagation();
-      setIsSidebarOpen(false);
-    };
-    window.addEventListener('keydown', handleDrawerKey, true);
-    return () => window.removeEventListener('keydown', handleDrawerKey, true);
-  }, [isCompactNavigation, isSidebarOpen]);
-
   // Trap platform-back only in webOS / installed PWA mode.
   // Normal Safari/desktop browser history remains native instead of being permanently re-pushed.
   useEffect(() => {
@@ -829,6 +823,7 @@ export default function App() {
                 {/* Sidebar Drawer Container */}
                 <div
                   id="category-sidebar-wrapper"
+                  ref={sidebarDialogRef}
                   role={isCompactNavigation ? 'dialog' : undefined}
                   aria-modal={isCompactNavigation ? 'true' : undefined}
                   aria-label={isCompactNavigation ? 'Categories' : undefined}
