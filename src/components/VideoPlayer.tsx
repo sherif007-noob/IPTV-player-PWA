@@ -915,8 +915,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           singleTapTimerRef.current = window.setTimeout(() => {
             singleTapTimerRef.current = null;
             tapRef.current = null;
-            setShowEpisodes(false);
-            toggleControls();
+            if (showEpisodes) {
+              setShowEpisodes(false);
+              revealControls();
+            } else {
+              toggleControls();
+            }
           }, side && !isLive ? 335 : 120);
         }}
       />
