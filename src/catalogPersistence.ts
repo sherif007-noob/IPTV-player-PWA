@@ -19,8 +19,7 @@ function readHot<T>(provider: string, kind: 'vod' | 'series', categoryId: string
   return hotCatalogs.get(hotKey(provider, kind, categoryId)) as { updatedAt: number; data: T[] } | undefined;
 }
 
-function isFallbackMockCatalog(kind: 'vod' | 'series', data: any[]) {
-  if (xtreamService.getIsDemo()) return true;
+function matchesMockCatalog(kind: 'vod' | 'series', data: any[]) {
   if (kind === 'vod') {
     return data.length === MOCK_MOVIES.length &&
       data.every((item, index) =>
@@ -41,7 +40,7 @@ async function persistRealCatalog<T>(
   categoryId: string,
   data: T[]
 ) {
-  if (!data.length || isFallbackMockCatalog(kind, data as any[])) return;
+  if (!data.length || xtreamService.getIsDemo() || matchesMockCatalog(kind, data as any[])) return;
   rememberHot(provider, kind, categoryId, data);
   await writeCatalog(provider, kind, categoryId, data);
 }
@@ -125,11 +124,15 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
   const filtered = await readFromAll<VodMovie>(provider, 'vod', key);
   if (filtered?.length) return filtered;
 
-  return deduped(
+  const data = await deduped(
     `${provider}:vod:${key}`,
     () => originalVod(key),
-    (data) => persistRealCatalog(provider, 'vod', key, data)
+    (result) => persistRealCatalog(provider, 'vod', key, result)
   );
+  if (!xtreamService.getIsDemo() && matchesMockCatalog('vod', data)) {
+    throw new Error('VOD provider request failed; demo fallback was rejected.');
+  }
+  return data;
 };
 
 xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem[]> => {
@@ -156,11 +159,15 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   const filtered = await readFromAll<SeriesItem>(provider, 'series', key);
   if (filtered?.length) return filtered;
 
-  return deduped(
+  const data = await deduped(
     `${provider}:series:${key}`,
     () => originalSeries(key),
-    (data) => persistRealCatalog(provider, 'series', key, data)
+    (result) => persistRealCatalog(provider, 'series', key, result)
   );
+  if (!xtreamService.getIsDemo() && matchesMockCatalog('series', data)) {
+    throw new Error('Series provider request failed; demo fallback was rejected.');
+  }
+  return data;
 };
 
 export async function invalidatePersistentCatalogs() {
