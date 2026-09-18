@@ -124,3 +124,10 @@ Important boundaries include:
 - touch/hover behavior: `(hover)` and `(pointer)` media features
 
 Keep behavior capability-driven when possible.
+
+
+## Special library lists and Home search
+
+Favorites, Watchlist, and Continue Watching do not require an "All Movies/Series" provider fetch. They are rendered from persisted user-state entries filtered by section.
+
+Home global search is the exception where a full catalog may be required. It is loaded lazily only when the user actually starts a Home search, rather than at application startup. Search-only catalog arrays are eligible to be released after the Home search ends to reduce iOS memory pressure.
