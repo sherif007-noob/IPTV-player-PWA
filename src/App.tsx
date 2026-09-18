@@ -723,7 +723,7 @@ export default function App() {
   return (
     <div
       id="webos-iptv-root"
-      className="flex flex-col h-screen w-screen bg-[#0b0e14] text-slate-100 overflow-hidden font-sans select-none"
+      className="flex flex-col h-full w-full bg-[#0b0e14] text-slate-100 overflow-hidden font-sans select-none"
     >
       {/* 1. Universal Top Header with Searchbar, Home button, Refresh & Settings */}
       <AppHeader
@@ -774,8 +774,8 @@ export default function App() {
                 <div
                   id="category-sidebar-wrapper"
                   className={`
-                    fixed inset-y-0 left-0 top-16 z-40 md:static md:top-auto md:z-auto
-                    h-[calc(100vh-4rem)] md:h-full transition-transform duration-300 ease-in-out
+                    fixed inset-y-0 left-0 top-0 z-40 md:static md:top-auto md:z-auto
+                    h-[100dvh] md:h-full transition-transform duration-300 ease-in-out
                     ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:hidden'}
                   `}
                 >
@@ -925,7 +925,7 @@ export default function App() {
               <div
                 id="main-scrollable-content-grid"
                 onScroll={handleGridScroll}
-                className="flex-1 overflow-y-auto p-6"
+                className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6"
               >
                 {isLoadingContent ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-3 py-16">
@@ -987,10 +987,10 @@ export default function App() {
                   <>
                     <div
                       id="content-card-grid"
-                      className={`grid gap-4 ${
+                      className={`content-card-grid grid gap-3 sm:gap-4 ${
                         currentView === 'live' && !headerSearchQuery.trim()
-                          ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
-                          : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+                          ? 'content-card-grid-live'
+                          : 'content-card-grid-poster'
                       }`}
                     >
                       {displayedGridItems.map((item) => (
