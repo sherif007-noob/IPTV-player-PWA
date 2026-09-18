@@ -19,7 +19,8 @@ function pruneCache<T>(cache: Map<string, Entry<T>>, now: number) {
     if (!entry.pending && entry.expiresAt <= now) cache.delete(key);
   }
 
-  while (cache.size > MAX_DETAIL_ENTRIES) {
+  let attempts = cache.size;
+  while (cache.size > MAX_DETAIL_ENTRIES && attempts-- > 0) {
     const oldest = cache.keys().next().value as string | undefined;
     if (!oldest) break;
     const entry = cache.get(oldest);
