@@ -32,8 +32,18 @@ export const HomePortal: React.FC<HomePortalProps> = ({
   onClearContinueWatching,
   onScrollPositionChange,
 }) => {
-  // Take the top 3 most recent continue watching titles
-  const recentThree = continueWatchingList.slice(0, 3);
+  // Show three unique recent titles. Series episode progress is stored per
+  // episode, so collapse multiple episode records into one Series card.
+  const recentThree = Array.from(
+    continueWatchingList.reduce((items, progress) => {
+      const identity =
+        progress.type === 'series'
+          ? `series:${progress.seriesId || progress.id}`
+          : `${progress.type}:${progress.id}`;
+      if (!items.has(identity)) items.set(identity, progress);
+      return items;
+    }, new Map<string, PlaybackProgress>()).values()
+  ).slice(0, 3);
 
   return (
     <div
