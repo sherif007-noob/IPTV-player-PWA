@@ -314,6 +314,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [seekFeedback, setSeekFeedback] = useState<string | null>(null);
   const [seekFeedbackSide, setSeekFeedbackSide] = useState<'left' | 'center' | 'right'>('center');
   const [showControls, setShowControls] = useState(true);
+  const showControlsRef = useRef(true);
   const [showEpisodes, setShowEpisodes] = useState(false);
   const [subtitleTracks, setSubtitleTracks] = useState<{ id: number; label: string; language: string }[]>([]);
   const [selectedSubtitleTrack, setSelectedSubtitleTrack] = useState(-1);
@@ -321,6 +322,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const isLive = item.type === 'live';
   const isSeries = item.type === 'series' || !!seriesContext;
   const metadataDuration = getKnownDuration(item, seriesContext);
+
+  const setControlsVisible = useCallback((visible: boolean) => {
+    showControlsRef.current = visible;
+    setShowControls(visible);
+  }, []);
 
   const scheduleControlsHide = useCallback(() => {
     if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
@@ -333,31 +339,37 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       scrubRef.current === null &&
       !keyboardFocus
     ) {
-      controlsTimerRef.current = window.setTimeout(() => setShowControls(false), 3000);
+      controlsTimerRef.current = window.setTimeout(() => {
+        controlsTimerRef.current = null;
+        setControlsVisible(false);
+      }, 3000);
     }
-  }, [isPlaying, isBuffering, playbackError, showEpisodes, keyboardFocus]);
+  }, [isPlaying, isBuffering, playbackError, showEpisodes, keyboardFocus, setControlsVisible]);
 
   const revealControls = useCallback(() => {
-    setShowControls(true);
-    scheduleControlsHide();
-  }, [scheduleControlsHide]);
+    if (controlsTimerRef.current !== null) {
+      window.clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = null;
+    }
+    setControlsVisible(true);
+    window.setTimeout(scheduleControlsHide, 0);
+  }, [scheduleControlsHide, setControlsVisible]);
 
   const toggleControls = useCallback(() => {
-    setShowControls((visible) => {
-      const next = !visible;
-      if (next) {
-        window.setTimeout(scheduleControlsHide, 0);
-      } else if (controlsTimerRef.current !== null) {
+    if (showControlsRef.current) {
+      if (controlsTimerRef.current !== null) {
         window.clearTimeout(controlsTimerRef.current);
         controlsTimerRef.current = null;
       }
-      return next;
-    });
-  }, [scheduleControlsHide]);
+      setControlsVisible(false);
+      return;
+    }
+    revealControls();
+  }, [revealControls, setControlsVisible]);
 
   useEffect(() => {
     if (isBuffering || playbackError || showEpisodes || scrubTime !== null || keyboardFocus || !isPlaying) {
-      setShowControls(true);
+      setControlsVisible(true);
       if (controlsTimerRef.current !== null) {
         window.clearTimeout(controlsTimerRef.current);
         controlsTimerRef.current = null;
@@ -365,7 +377,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       return;
     }
     scheduleControlsHide();
-  }, [isBuffering, playbackError, showEpisodes, scrubTime, keyboardFocus, isPlaying, scheduleControlsHide]);
+  }, [isBuffering, playbackError, showEpisodes, scrubTime, keyboardFocus, isPlaying, scheduleControlsHide, setControlsVisible]);
 
   useEffect(() => () => {
     if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
@@ -889,7 +901,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             if (!event.isPrimary || event.button !== 0) return;
             setShowEpisodes(false);
             if (mouseClickStartedVisibleRef.current) {
-              setShowControls(false);
+              setControlsVisible(false);
               if (controlsTimerRef.current !== null) {
                 window.clearTimeout(controlsTimerRef.current);
                 controlsTimerRef.current = null;
