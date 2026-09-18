@@ -1101,3 +1101,158 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+
+/* Final visual contract: original neon TV language + true dark frosted glass. */
+:root {
+  --glass-obsidian: rgba(7, 12, 26, 0.58);
+  --glass-panel: rgba(15, 23, 42, 0.62);
+  --glass-control: rgba(15, 23, 42, 0.54);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-highlight: rgba(255, 255, 255, 0.05);
+  --glass-shadow: 0 14px 42px rgba(0, 0, 0, 0.34);
+}
+
+/* Header / drawer / modal glass. */
+.app-header {
+  background: var(--glass-obsidian) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  backdrop-filter: blur(22px) saturate(145%);
+  border-color: var(--glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 34px rgba(0, 0, 0, 0.32) !important;
+}
+#category-sidebar-panel {
+  background: rgba(7, 12, 26, 0.60) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  border-color: var(--glass-border) !important;
+  box-shadow: inset -1px 0 0 rgba(255,255,255,.035), 16px 0 44px rgba(0,0,0,.35) !important;
+}
+#sidebar-mobile-backdrop {
+  background: rgba(2, 6, 23, 0.32);
+  -webkit-backdrop-filter: blur(5px) saturate(120%);
+  backdrop-filter: blur(5px) saturate(120%);
+}
+.library-subheader {
+  background: rgba(2, 6, 23, 0.44) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  backdrop-filter: blur(14px) saturate(130%);
+  border-color: rgba(255,255,255,.08) !important;
+}
+.modal-shell {
+  background-color: rgba(2, 6, 23, 0.42) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(125%);
+  backdrop-filter: blur(8px) saturate(125%);
+}
+.modal-shell-card {
+  background: rgba(15, 23, 42, 0.70) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  backdrop-filter: blur(22px) saturate(145%);
+  border-color: var(--glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 22px 70px rgba(0,0,0,.52) !important;
+}
+
+/* Floating controls keep a compact visual object while their hit target may be larger. */
+.stream-card-action-visual,
+#btn-close-category-sidebar,
+#btn-header-refresh,
+#btn-header-font-size,
+#btn-header-settings {
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-color: var(--glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0,0,0,.24);
+}
+
+/* Preserve the original TV focus signature exactly. */
+.tv-focus {
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.tv-focus:focus,
+.tv-focus:focus-visible {
+  outline: 2px solid #38bdf8 !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.5),
+              inset 0 0 15px rgba(56, 189, 248, 0.15) !important;
+  transform: scale(1.02);
+  z-index: 10;
+}
+
+/* Fine pointers: card itself is the primary animated object. */
+@media (hover: hover) and (pointer: fine) {
+  .stream-card,
+  .home-portal-card,
+  .home-recent-card {
+    transform-origin: center;
+    transition:
+      transform 300ms ease-out,
+      border-color 300ms ease-out,
+      box-shadow 300ms ease-out,
+      background-color 300ms ease-out;
+  }
+  .stream-card:hover,
+  .home-portal-card:hover,
+  .home-recent-card:hover {
+    transform: translateY(-0.25rem) scale(1.03);
+  }
+  .stream-card img,
+  .home-recent-card img {
+    transition: transform 500ms ease-out;
+  }
+  .stream-card:hover img,
+  .stream-card:focus img,
+  .home-recent-card:hover img,
+  .home-recent-card:focus img {
+    transform: scale(1.08);
+  }
+}
+
+/* Touch gets press feedback, never sticky simulated hover. */
+@media (hover: none), (pointer: coarse) {
+  .stream-card:active,
+  .home-portal-card:active,
+  .home-recent-card:active {
+    transform: scale(0.985);
+    transition-duration: 120ms;
+  }
+}
+
+/* Player OSD: glass controls and deterministic 300ms fade. */
+#video-player .player-top,
+#video-player .player-bottom {
+  transition: opacity 300ms ease !important;
+}
+#video-player .player-top button,
+#video-player .player-bottom button:not([aria-label="Play"]):not([aria-label="Pause"]),
+#video-player .player-bottom select,
+#video-player .player-episodes button {
+  background-color: var(--glass-control) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-color: var(--glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 22px rgba(0,0,0,.28);
+}
+#video-player .player-episodes {
+  background: rgba(7, 12, 26, .68) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(145%);
+  backdrop-filter: blur(20px) saturate(145%);
+  border-color: var(--glass-border) !important;
+}
+
+/* Scrubber thumb: reveal on hover/focus for fine pointers, always visible on touch. */
+@media (hover: hover) and (pointer: fine) {
+  #video-player .player-seek-thumb {
+    transform: translate(-50%, -50%) scale(0);
+    transition: left 75ms linear, transform 150ms ease-out;
+  }
+  #video-player .relative.h-11:has(.seek-slider:hover) .player-seek-thumb,
+  #video-player .relative.h-11:has(.seek-slider:focus-visible) .player-seek-thumb {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@media (hover: none), (pointer: coarse) {
+  #video-player .player-seek-thumb {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
