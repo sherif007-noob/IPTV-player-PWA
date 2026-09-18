@@ -290,6 +290,145 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   }
 }
 
+
+/* Player interaction polish across phone, tablet, and desktop. */
+#video-player {
+  --player-edge-x: max(12px, env(safe-area-inset-left));
+  --player-edge-r: max(12px, env(safe-area-inset-right));
+  --player-edge-top: max(12px, env(safe-area-inset-top));
+  --player-edge-bottom: max(12px, env(safe-area-inset-bottom));
+}
+#video-player .player-top,
+#video-player .player-bottom {
+  transition: opacity 180ms ease;
+}
+#video-player .player-seek-thumb {
+  opacity: 0.9;
+}
+#video-player .seek-slider:hover ~ .player-seek-thumb,
+#video-player .seek-slider:focus-visible ~ .player-seek-thumb {
+  transform: translate(-50%, -50%) scale(1.08);
+}
+#video-player .player-scrub-preview {
+  z-index: 2;
+  white-space: nowrap;
+}
+#video-player .player-episodes {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+/* Touch-first player layout: larger useful hit areas, compact visuals. */
+@media (hover: none), (pointer: coarse) {
+  #video-player .seek-slider {
+    min-height: 48px;
+  }
+  #video-player .player-seek-thumb {
+    width: 18px;
+    height: 18px;
+  }
+  #video-player .player-top button,
+  #video-player .player-bottom button,
+  #video-player .player-bottom select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  #video-player .player-seek-feedback > div {
+    min-width: 72px;
+    text-align: center;
+  }
+}
+
+/* Phone portrait: episode list behaves like a bottom sheet and controls stay compact. */
+@media (max-width: 640px) and (orientation: portrait) {
+  #video-player .player-top {
+    padding-top: var(--player-edge-top);
+    padding-left: var(--player-edge-x);
+    padding-right: var(--player-edge-r);
+  }
+  #video-player .player-bottom {
+    padding-left: var(--player-edge-x);
+    padding-right: var(--player-edge-r);
+    padding-bottom: var(--player-edge-bottom);
+  }
+  #video-player .player-top h2 {
+    font-size: 0.875rem;
+  }
+  #video-player .player-episodes {
+    top: auto !important;
+    left: 8px;
+    right: 8px;
+    bottom: max(82px, calc(env(safe-area-inset-bottom) + 70px));
+    width: auto;
+    max-width: none;
+    max-height: min(52dvh, 430px);
+    border-radius: 18px;
+  }
+  #video-player .player-bottom > div:last-child {
+    gap: 8px;
+  }
+  #video-player .player-bottom button {
+    font-size: 0.8125rem;
+  }
+}
+
+/* iPad/tablet portrait: keep side panel but make it wider and comfortably reachable. */
+@media (min-width: 641px) and (max-width: 1024px) and (orientation: portrait) {
+  #video-player .player-episodes {
+    top: max(72px, calc(env(safe-area-inset-top) + 56px));
+    right: max(16px, env(safe-area-inset-right));
+    width: min(380px, calc(100vw - 32px));
+    max-height: 64dvh;
+  }
+}
+
+/* Short landscape phones: reduce vertical chrome so video remains dominant. */
+@media (max-height: 500px) and (orientation: landscape) {
+  #video-player .player-top {
+    padding-top: max(6px, env(safe-area-inset-top));
+    padding-bottom: 8px;
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+  #video-player .player-bottom {
+    padding-top: 8px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+  #video-player .player-bottom > div:first-child {
+    margin-bottom: 6px;
+  }
+  #video-player .player-bottom .relative.h-11 {
+    height: 34px;
+  }
+  #video-player .player-top h2 {
+    font-size: 0.875rem;
+  }
+  #video-player .player-top button,
+  #video-player .player-bottom button,
+  #video-player .player-bottom select {
+    min-height: 38px;
+  }
+  #video-player .player-episodes {
+    top: max(54px, calc(env(safe-area-inset-top) + 42px));
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(58px, calc(env(safe-area-inset-bottom) + 50px));
+    width: min(340px, 48vw);
+    max-height: none;
+  }
+  #video-player .player-seek-feedback {
+    transform: scale(0.9);
+  }
+}
+
+/* Fine pointers get a slightly smaller thumb until hover/focus. */
+@media (hover: hover) and (pointer: fine) {
+  #video-player .player-seek-thumb {
+    width: 14px;
+    height: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
