@@ -255,3 +255,6 @@ The controls timer must retain one generation/deadline owner. Do not add a secon
 - Begin loading Live/categories/VOD/Series on provider A, then connect provider B before A finishes. No late A response may become visible or remain in the underlying service cache for B.
 - After a successful provider switch, Movies/Series React arrays and last-provider catalog counts must reset before B is reloaded.
 - Switching provider while Favorites/Continue/Watchlist is open must not force a full B catalog fetch merely to render that special list.
+
+
+- Switch providers while Home is visible: the old provider's Live count/list must disappear immediately and Home must repopulate from the new provider, not keep stale Live React state.
