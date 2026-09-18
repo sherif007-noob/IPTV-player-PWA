@@ -376,12 +376,15 @@ export default function App() {
   }, [currentView, selectedCategoryId]);
 
   const saveCurrentScrollPosition = useCallback(() => {
-    const grid = document.getElementById('main-scrollable-content-grid');
-    if (!grid) return;
+    const scrollSurface =
+      currentView === 'home'
+        ? document.getElementById('home-portal-dashboard')
+        : document.getElementById('main-scrollable-content-grid');
+    if (!scrollSurface) return;
     try {
       localStorage.setItem(
         `${SCROLL_KEY_PREFIX}${currentView}:${selectedCategoryId}`,
-        String(grid.scrollTop)
+        String(scrollSurface.scrollTop)
       );
     } catch {}
   }, [currentView, selectedCategoryId]);
@@ -401,6 +404,7 @@ export default function App() {
 
   // Navigation handlers
   const handleSelectView = (view: MainNavView, initialCategoryId: string = 'all') => {
+    saveCurrentScrollPosition();
     const switchingSection = view !== currentView;
     if (switchingSection) {
       loadRequestIdRef.current += 1;
@@ -428,6 +432,7 @@ export default function App() {
   };
 
   const handleNavigateHome = () => {
+    saveCurrentScrollPosition();
     loadRequestIdRef.current += 1;
     setViewHistory((prev) => (prev[prev.length - 1] === 'home' ? prev : [...prev, 'home']));
     setCurrentView('home');
@@ -455,6 +460,7 @@ export default function App() {
 
   // Category Selection
   const handleSelectCategory = (catId: string) => {
+    saveCurrentScrollPosition();
     setSelectedCategoryId(catId);
     if (isCompactNavigation) setIsSidebarOpen(false);
 
@@ -527,15 +533,19 @@ export default function App() {
 
   useEffect(() => {
     if (!isHomeSearchActive) {
+      let releasedSearchCatalog = false;
       if (homeSearchOwnedCatalogsRef.current.vod && currentView !== 'vod') {
         setMovies([]);
         fullCatalogLoadedRef.current.vod = false;
+        releasedSearchCatalog = true;
       }
       if (homeSearchOwnedCatalogsRef.current.series && currentView !== 'series') {
         setSeries([]);
         fullCatalogLoadedRef.current.series = false;
+        releasedSearchCatalog = true;
       }
       homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
+      if (releasedSearchCatalog) releaseCatalogMemory();
       return;
     }
 
@@ -1003,14 +1013,17 @@ export default function App() {
     if (isLoadingContent) return;
     const key = `${SCROLL_KEY_PREFIX}${currentView}:${selectedCategoryId}`;
     const restore = window.requestAnimationFrame(() => {
-      const grid = document.getElementById('main-scrollable-content-grid');
-      if (!grid) return;
+      const scrollSurface =
+        currentView === 'home'
+          ? document.getElementById('home-portal-dashboard')
+          : document.getElementById('main-scrollable-content-grid');
+      if (!scrollSurface) return;
       const saved = Number(localStorage.getItem(key) || 0);
       if (Number.isFinite(saved) && saved > 0) {
         headerScrollStateRef.current.lastTop = saved;
         headerScrollStateRef.current.direction = 0;
         headerScrollStateRef.current.accumulated = 0;
-        grid.scrollTop = saved;
+        scrollSurface.scrollTop = saved;
       }
     });
     return () => window.cancelAnimationFrame(restore);
