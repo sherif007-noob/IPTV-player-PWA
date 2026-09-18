@@ -14,7 +14,7 @@ function Harness(){
  {mode==='player' && <VideoPlayer item={item} streamUrl="http://example.invalid/movie/test.mkv" onClose={()=>setMode('closed')} onUpdateProgress={()=>{}} />}
  {mode==='details' && <DetailsModal item={item} progress={null} isFavorite={false} isInWatchlist={false} onClose={()=>setMode('closed')} onPlay={()=>{}} onToggleFavorite={()=>{}} onToggleWatchlist={()=>{}} onToggleEpisodeWatched={()=>{}} isEpisodeWatched={()=>false} getSeasonProgress={()=>({watchedCount:0,total:10,percentage:0})} />}
  {mode==='series' && <DetailsModal item={{...item,type:'series'}} progress={null} isFavorite={false} isInWatchlist={false} onClose={()=>setMode('closed')} onPlay={()=>{}} onToggleFavorite={()=>{}} onToggleWatchlist={()=>{}} onToggleEpisodeWatched={()=>{}} isEpisodeWatched={()=>false} getSeasonProgress={()=>({watchedCount:0,total:10,percentage:0})} />}
- {mode==='settings' && <ServerLoginModal isOpen onClose={()=>setMode('closed')} onSuccess={()=>{}} isDemo />}
+ {mode==='settings' && <ServerLoginModal isOpen onClose={()=>setMode('closed')} onSuccess={()=>{}} currentCredentials={null} userInfo={null} serverInfo={null} isDemo />}
  {mode==='header' && <AppHeader currentView="home" onNavigateHome={()=>{}} onSelectView={()=>{}} searchQuery="" onSearchChange={()=>{}} onOpenSettings={()=>{}} onRefresh={()=>{}} isRefreshing={false} isDemo />}
  </>
 }
