@@ -1193,7 +1193,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <button onClick={() => handleSeek(-10, 'left')} className="player-control glass-control tv-focus p-2.5 rounded-xl text-white flex items-center gap-1 text-sm">
                   <RotateCcw className="w-4 h-4" /> 10s
                 </button>
-                <button onClick={() => handleSeek(10, 'right')} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white flex items-center gap-1 text-sm">
+                <button onClick={() => handleSeek(10, 'right')} className="player-control glass-control tv-focus p-2.5 rounded-xl text-white flex items-center gap-1 text-sm">
                   <RotateCw className="w-4 h-4" /> 10s
                 </button>
               </>
