@@ -985,7 +985,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               : 'inset-x-0 justify-center'
           }`}
         >
-          <div className="rounded-full border border-sky-500/50 bg-black/75 px-5 py-3 text-lg sm:text-xl font-bold text-white backdrop-blur-md shadow-xl">
+          <div className="rounded-xl border border-sky-500/50 bg-black/85 px-6 py-4 text-xl font-bold text-white backdrop-blur-md shadow-xl">
             {seekFeedback}
           </div>
         </div>
