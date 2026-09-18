@@ -125,3 +125,8 @@ IndexedDB is the durable catalog layer; full catalogs do not need to stay reside
 
 
 Home scroll position uses the same lightweight localStorage restoration path as library/category scroll positions.
+
+
+## Lightweight catalog counts
+
+Releasing full VOD/Series arrays must not make the Home dashboard forget the last known catalog sizes. The app stores only `vod` and `series` counts plus the provider identity in `iptv_catalog_counts_v1`. Counts are refreshed whenever a full catalog is successfully loaded and reset when the configured provider identity changes.
