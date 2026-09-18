@@ -1,4 +1,4 @@
-import { useDialog } from '../hooks/useDialog';
+import { ModalShell } from './ModalShell';
 import React, { useState } from 'react';
 import {
   Server,
@@ -44,8 +44,6 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
   tvFontSize = 'huge',
   onTvFontSizeChange,
 }) => {
-  const dialogRef = useDialog(isOpen, onClose);
-  const backdropStart = React.useRef(false);
   const [server, setServer] = useState(
     currentCredentials?.server && !currentCredentials.server.includes('your-provider.com')
       ? currentCredentials.server
@@ -138,24 +136,15 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
   };
 
   return (
-    <div
-      id="server-login-modal-overlay"
-      onPointerDown={(event) => { backdropStart.current = event.target === event.currentTarget; }}
-      onClick={(event) => {
-        if (backdropStart.current && event.target === event.currentTarget) onClose();
-        backdropStart.current = false;
-      }}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-4"
+    <ModalShell
+      open={isOpen}
+      onClose={onClose}
+      overlayId="server-login-modal-overlay"
+      cardId="server-login-card"
+      ariaLabel="Server settings"
+      overlayClassName="z-50 bg-black/80 backdrop-blur-2xl p-4"
+      cardClassName="w-full max-w-xl max-h-[calc(100dvh-2rem)] bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col shadow-2xl shadow-black/80"
     >
-      <div
-        id="server-login-card"
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Server settings"
-        tabIndex={-1}
-        className="w-full max-w-xl bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col shadow-2xl shadow-black/80"
-      >
         {/* Header */}
         <div className="p-5 border-b border-white/10 flex items-center justify-between bg-slate-950/70 backdrop-blur-md">
           <div className="flex items-center gap-3">
@@ -477,7 +466,6 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
             </div>
           </div>
         </form>
-      </div>
-    </div>
+    </ModalShell>
   );
 };
