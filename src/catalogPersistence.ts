@@ -1,6 +1,7 @@
 import { xtreamService } from './services/xtream';
 import { readCatalog, writeCatalog, clearCatalogs } from './services/catalogStore';
 import { VodMovie, SeriesItem } from './types';
+import { MOCK_MOVIES, MOCK_SERIES } from './services/mockData';
 
 const TTL_MS = 6 * 60 * 60 * 1000;
 const inFlight = new Map<string, Promise<any[]>>();
@@ -16,6 +17,33 @@ function rememberHot<T>(provider: string, kind: 'vod' | 'series', categoryId: st
 
 function readHot<T>(provider: string, kind: 'vod' | 'series', categoryId: string) {
   return hotCatalogs.get(hotKey(provider, kind, categoryId)) as { updatedAt: number; data: T[] } | undefined;
+}
+
+function isFallbackMockCatalog(kind: 'vod' | 'series', data: any[]) {
+  if (xtreamService.getIsDemo()) return true;
+  if (kind === 'vod') {
+    return data.length === MOCK_MOVIES.length &&
+      data.every((item, index) =>
+        Number(item?.stream_id) === Number(MOCK_MOVIES[index]?.stream_id) &&
+        String(item?.name || '') === String(MOCK_MOVIES[index]?.name || '')
+      );
+  }
+  return data.length === MOCK_SERIES.length &&
+    data.every((item, index) =>
+      Number(item?.series_id) === Number(MOCK_SERIES[index]?.series_id) &&
+      String(item?.name || '') === String(MOCK_SERIES[index]?.name || '')
+    );
+}
+
+async function persistRealCatalog<T>(
+  provider: string,
+  kind: 'vod' | 'series',
+  categoryId: string,
+  data: T[]
+) {
+  if (!data.length || isFallbackMockCatalog(kind, data as any[])) return;
+  rememberHot(provider, kind, categoryId, data);
+  await writeCatalog(provider, kind, categoryId, data);
 }
 
 const originalVod = xtreamService.getVodStreams.bind(xtreamService);
@@ -88,10 +116,7 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
       void deduped(
         `${provider}:vod:${key}`,
         () => originalVod(key),
-        async (data) => {
-          rememberHot(provider, 'vod', key, data);
-          await writeCatalog(provider, 'vod', key, data);
-        }
+        (data) => persistRealCatalog(provider, 'vod', key, data)
       ).catch((error) => console.warn('Background VOD refresh notice:', error));
     }
     return exact.data;
@@ -103,10 +128,7 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
   return deduped(
     `${provider}:vod:${key}`,
     () => originalVod(key),
-    async (data) => {
-      rememberHot(provider, 'vod', key, data);
-      await writeCatalog(provider, 'vod', key, data);
-    }
+    (data) => persistRealCatalog(provider, 'vod', key, data)
   );
 };
 
@@ -125,10 +147,7 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
       void deduped(
         `${provider}:series:${key}`,
         () => originalSeries(key),
-        async (data) => {
-          rememberHot(provider, 'series', key, data);
-          await writeCatalog(provider, 'series', key, data);
-        }
+        (data) => persistRealCatalog(provider, 'series', key, data)
       ).catch((error) => console.warn('Background Series refresh notice:', error));
     }
     return exact.data;
@@ -140,10 +159,7 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   return deduped(
     `${provider}:series:${key}`,
     () => originalSeries(key),
-    async (data) => {
-      rememberHot(provider, 'series', key, data);
-      await writeCatalog(provider, 'series', key, data);
-    }
+    (data) => persistRealCatalog(provider, 'series', key, data)
   );
 };
 
