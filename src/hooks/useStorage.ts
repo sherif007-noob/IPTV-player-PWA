@@ -119,6 +119,28 @@ export function useStorage() {
     } catch { return []; }
   });
 
+  const continueWatchingRef = useRef<PlaybackProgress[]>(continueWatching);
+
+  const commitContinueWatching = useCallback((
+    nextOrUpdater:
+      | PlaybackProgress[]
+      | ((previous: PlaybackProgress[]) => PlaybackProgress[])
+  ) => {
+    const previous = continueWatchingRef.current;
+    const next =
+      typeof nextOrUpdater === 'function'
+        ? nextOrUpdater(previous)
+        : nextOrUpdater;
+
+    continueWatchingRef.current = next;
+    setContinueWatching(next);
+    try {
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(next));
+    } catch (e) {
+      console.error('Failed to save playback progress', e);
+    }
+  }, []);
+
   const [watchedEpisodes, setWatchedEpisodes] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem(WATCHED_EPISODES_KEY);
@@ -168,7 +190,7 @@ export function useStorage() {
     const progress = normalizeTranscodedProgress(incoming);
 
     if (progress.type === 'live') {
-      setContinueWatching((prev) => {
+      commitContinueWatching((prev) => {
         const filtered = prev.filter((p) => !(p.type === 'live' && String(p.id) === String(progress.id)));
         return [{ ...progress, timestamp: 1, duration: 1, lastUpdated: Date.now() }, ...filtered].slice(0, 50);
       });
@@ -181,14 +203,16 @@ export function useStorage() {
     }
     if (progress.timestamp < 5) return;
 
-    setContinueWatching((prev) => {
+    commitContinueWatching((prev) => {
       const filtered = prev.filter((p) => p.id !== progress.id);
       return [{ ...progress, lastUpdated: Date.now() }, ...filtered].slice(0, 50);
     });
-  }, []);
+  }, [commitContinueWatching]);
 
   const getProgress = useCallback((id: string | number) => continueWatching.find((p) => String(p.id) === String(id)) || null, [continueWatching]);
-  const removeProgress = useCallback((id: string | number) => { setContinueWatching((prev) => prev.filter((p) => String(p.id) !== String(id))); }, []);
+  const removeProgress = useCallback((id: string | number) => {
+    commitContinueWatching((prev) => prev.filter((p) => String(p.id) !== String(id)));
+  }, [commitContinueWatching]);
 
   const makeEpisodeKey = (seriesId: number, seasonNum: number, episodeNum: number) => `${seriesId}_s${seasonNum}_e${episodeNum}`;
 
@@ -217,9 +241,9 @@ export function useStorage() {
   }, []);
 
   const clearContinueWatching = useCallback((type?: string) => {
-    if (type) setContinueWatching((prev) => prev.filter((p) => p.type !== type));
-    else setContinueWatching([]);
-  }, []);
+    if (type) commitContinueWatching((prev) => prev.filter((p) => p.type !== type));
+    else commitContinueWatching([]);
+  }, [commitContinueWatching]);
 
   const getEpisodeProgress = useCallback((seriesId: number, seasonNum: number, episodeNum: number, episodeId?: string | number) => {
     return continueWatching.find((p) => {
