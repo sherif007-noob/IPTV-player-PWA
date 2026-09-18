@@ -198,7 +198,7 @@ export function useStorage() {
     }
 
     if (progress.duration > 0 && progress.timestamp / progress.duration > 0.95) {
-      setContinueWatching((prev) => prev.filter((p) => p.id !== progress.id));
+      commitContinueWatching((prev) => prev.filter((p) => p.id !== progress.id));
       return;
     }
     if (progress.timestamp < 5) return;
