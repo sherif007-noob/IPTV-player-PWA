@@ -82,7 +82,10 @@ async function readFromAll<T extends { category_id: string }>(
   if (categoryId === 'all') return null;
 
   const hotAll = readHot<T>(provider, kind, 'all');
-  if (hotAll?.data?.length) {
+  if (
+    hotAll?.data?.length &&
+    (xtreamService.getIsDemo() || !matchesMockCatalog(kind, hotAll.data as any[]))
+  ) {
     const filtered = hotAll.data.filter((item) => item.category_id === categoryId);
     if (filtered.length) {
       rememberHot(provider, kind, categoryId, filtered, hotAll.updatedAt);
@@ -92,6 +95,10 @@ async function readFromAll<T extends { category_id: string }>(
 
   const all = await readCatalog<T[]>(provider, kind, 'all');
   if (!all?.data?.length) return null;
+  if (!xtreamService.getIsDemo() && matchesMockCatalog(kind, all.data as any[])) {
+    await clearCatalogs(provider);
+    return null;
+  }
   rememberHot(provider, kind, 'all', all.data, all.updatedAt);
   const filtered = all.data.filter((item) => item.category_id === categoryId);
   if (filtered.length) rememberHot(provider, kind, categoryId, filtered, all.updatedAt);
@@ -106,7 +113,10 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
   if (hot?.data?.length && Date.now() - hot.updatedAt <= TTL_MS) return hot.data;
 
   const exact = await readCatalog<VodMovie[]>(provider, 'vod', key);
-  if (exact?.data?.length) {
+  if (
+    exact?.data?.length &&
+    (xtreamService.getIsDemo() || !matchesMockCatalog('vod', exact.data))
+  ) {
     rememberHot(provider, 'vod', key, exact.data, exact.updatedAt);
     if (Date.now() - exact.updatedAt > TTL_MS) {
       // Force the wrapped service's own RAM cache cold so stale-while-revalidate
@@ -119,6 +129,10 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
       ).catch((error) => console.warn('Background VOD refresh notice:', error));
     }
     return exact.data;
+  }
+  if (exact?.data?.length && !xtreamService.getIsDemo() && matchesMockCatalog('vod', exact.data)) {
+    hotCatalogs.delete(hotKey(provider, 'vod', key));
+    await clearCatalogs(provider);
   }
 
   const filtered = await readFromAll<VodMovie>(provider, 'vod', key);
@@ -143,7 +157,10 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   if (hot?.data?.length && Date.now() - hot.updatedAt <= TTL_MS) return hot.data;
 
   const exact = await readCatalog<SeriesItem[]>(provider, 'series', key);
-  if (exact?.data?.length) {
+  if (
+    exact?.data?.length &&
+    (xtreamService.getIsDemo() || !matchesMockCatalog('series', exact.data))
+  ) {
     rememberHot(provider, 'series', key, exact.data, exact.updatedAt);
     if (Date.now() - exact.updatedAt > TTL_MS) {
       xtreamService.clearCache();
@@ -154,6 +171,10 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
       ).catch((error) => console.warn('Background Series refresh notice:', error));
     }
     return exact.data;
+  }
+  if (exact?.data?.length && !xtreamService.getIsDemo() && matchesMockCatalog('series', exact.data)) {
+    hotCatalogs.delete(hotKey(provider, 'series', key));
+    await clearCatalogs(provider);
   }
 
   const filtered = await readFromAll<SeriesItem>(provider, 'series', key);
