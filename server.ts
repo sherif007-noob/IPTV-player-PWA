@@ -171,7 +171,7 @@ async function startServer() {
   const hlsTranscodeArgs = () => [
     "-map", "0:v:0", "-map", "0:a:0?",
     "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency",
-    "-profile:v", "main", "-level:v", "3.1", "-pix_fmt", "yuv420p",
+    "-profile:v", "main", "-level:v", "4.1", "-pix_fmt", "yuv420p",
     "-bf", "0", "-refs", "1", "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
     "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
     "-avoid_negative_ts", "make_zero",
@@ -235,13 +235,12 @@ async function startServer() {
     const args = [
       "-hide_banner", "-loglevel", "info", "-nostdin",
       "-i", "pipe:0",
-      ...(start > 0 ? ["-ss", String(start)] : []),
       ...hlsTranscodeArgs(),
       "-f", "hls",
       "-hls_time", "2",
-      "-hls_list_size", "8",
-      "-hls_delete_threshold", "3",
-      "-hls_flags", "delete_segments+independent_segments+temp_file",
+      "-hls_list_size", "0",
+      "-hls_playlist_type", "event",
+      "-hls_flags", "independent_segments+temp_file",
       "-hls_segment_filename", segmentPattern,
       playlist,
     ];
