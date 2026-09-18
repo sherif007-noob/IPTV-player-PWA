@@ -359,7 +359,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [activeUrl, metadataDuration]);
 
   useEffect(() => {
-    const generated = usesGeneratedHls(streamUrl);
     const next = buildPlaybackUrl(streamUrl);
     initialNativeSeekRef.current = Math.max(0, initialTime);
     resumeAfterSourceChangeRef.current = true;
