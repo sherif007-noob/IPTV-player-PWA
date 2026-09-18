@@ -360,14 +360,11 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   .stream-card-action,
   .details-watched-toggle,
   #btn-header-hamburger,
-  #btn-header-home,
-  #btn-header-settings,
-  #btn-pwa-install-header,
   #btn-close-category-sidebar,
   #btn-clear-header-search {
-    min-width: 44px;
-    width: 44px;
-    min-height: 44px;
+    min-width: var(--ds-touch-target);
+    width: var(--ds-touch-target);
+    min-height: var(--ds-touch-target);
   }
   .tv-focus:focus:not(:focus-visible) { outline: none !important; box-shadow: none !important; transform: none; }
 }
