@@ -42,7 +42,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
           onSelect(item);
         }
       }}
-      className="stream-card group relative rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-md border border-white/10 overflow-hidden cursor-pointer tv-focus flex flex-col hover:border-sky-400 focus:border-sky-400 shadow-lg hover:shadow-sky-500/20 hover:-translate-y-1 transition-all duration-300"
+      className="stream-card interactive-card group relative rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 overflow-hidden cursor-pointer tv-focus flex flex-col hover:border-sky-400 focus:border-sky-400 shadow-lg hover:shadow-sky-500/20"
     >
       {/* Media Thumbnail Container */}
       <div
@@ -111,7 +111,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
               isFavorite ? 'text-slate-950' : 'text-slate-300 hover:text-amber-400'
             }`}
           >
-            <span className={`stream-card-action-visual p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
+            <span className={`stream-card-action-visual p-1.5 rounded-xl glass-control transition-all duration-200 ${
               isFavorite
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/40'
                 : 'bg-slate-950/70 border border-white/10'
@@ -133,7 +133,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
                 isInWatchlist ? 'text-white' : 'text-slate-300 hover:text-sky-400'
               }`}
             >
-              <span className={`stream-card-action-visual p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
+              <span className={`stream-card-action-visual p-1.5 rounded-xl glass-control transition-all duration-200 ${
                 isInWatchlist
                   ? 'bg-sky-500 text-white shadow-md shadow-sky-500/40'
                   : 'bg-slate-950/70 border border-white/10'
