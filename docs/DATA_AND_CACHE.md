@@ -116,4 +116,4 @@ Playback progress mutations synchronously write the updated progress list to loc
 
 ## Provider failure / demo fallback safety
 
-The underlying Xtream service can return built-in demo arrays when a provider request fails. The persistent wrapper compares returned catalogs against the exported demo fixtures and does **not** write those fallback arrays to hot cache or IndexedDB for a real provider. This prevents a transient network/provider failure from poisoning the persistent catalog for the normal TTL.
+The underlying Xtream service can return built-in demo arrays when a provider request fails. The persistent wrapper compares returned catalogs against the exported demo fixtures. For a real provider it rejects the fallback result, does **not** write it to hot cache or IndexedDB, and self-heals matching legacy persisted fallback entries before retrying the provider path. This prevents a transient network/provider failure from masquerading as real catalog data or poisoning the persistent cache for the normal TTL.
