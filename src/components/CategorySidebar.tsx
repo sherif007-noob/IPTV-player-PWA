@@ -62,7 +62,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
       id="category-sidebar-panel"
       role="navigation"
       aria-label={`${title} categories`}
-      className="w-72 sm:w-80 md:w-64 max-w-[85vw] h-full bg-slate-950/95 md:bg-slate-950/80 backdrop-blur-xl border-r border-white/10 flex flex-col shrink-0 select-none shadow-2xl md:shadow-xl"
+      className="w-72 sm:w-80 md:w-64 max-w-[85vw] h-full bg-slate-950/60 md:bg-slate-950/66 backdrop-blur-2xl border-r border-white/10 flex flex-col shrink-0 select-none shadow-2xl md:shadow-xl"
     >
       {/* Category Header */}
       <div className="p-3.5 border-b border-white/10 space-y-2">
@@ -83,7 +83,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
                 onClick={onClose}
                 title="Close Categories Sidebar"
                 aria-label="Close categories"
-                className="md:hidden p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                className="md:hidden p-1 rounded-lg text-slate-400 hover:text-white bg-slate-900/45 backdrop-blur-md border border-white/10 hover:bg-slate-800/70 tv-focus transition-all duration-200"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -238,7 +238,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
               id={`category-item-${category.category_id}`}
               aria-current={isSelected ? 'page' : undefined}
               onClick={() => onSelectCategory(category.category_id)}
-              className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between tv-focus ${
+              className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between tv-focus transition-all duration-200 ${
                 isSelected
                   ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-semibold'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
