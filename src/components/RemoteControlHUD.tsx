@@ -5,12 +5,9 @@ import {
   Search,
   RotateCcw,
   RotateCw,
-  Play,
   ChevronUp,
   ChevronDown,
-  Tv,
 } from 'lucide-react';
-import { WEBOS_KEYS } from '../types';
 
 interface RemoteControlHUDProps {
   onBack: () => void;
@@ -36,7 +33,7 @@ export const RemoteControlHUD: React.FC<RemoteControlHUDProps> = ({
     >
       {/* Collapsible Panel */}
       {isOpen && (
-        <div className="mb-2 p-3.5 rounded-2xl bg-slate-950 border border-slate-700 text-xs space-y-3 w-64">
+        <div className="glass-chrome mb-2 p-3.5 rounded-2xl text-xs space-y-3 w-64">
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <div className="flex items-center gap-1.5 font-bold text-white">
               <Compass className="w-4 h-4 text-sky-400" />
@@ -79,7 +76,7 @@ export const RemoteControlHUD: React.FC<RemoteControlHUDProps> = ({
               <button
                 id="hud-btn-back"
                 onClick={onBack}
-                className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:border-slate-500 font-medium text-xs"
+                className="glass-control tv-focus flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-slate-200 hover:text-white text-xs"
               >
                 <CornerDownLeft className="w-3.5 h-3.5 text-rose-400" />
                 <span>Back [ESC]</span>
@@ -88,7 +85,7 @@ export const RemoteControlHUD: React.FC<RemoteControlHUDProps> = ({
               <button
                 id="hud-btn-search"
                 onClick={onSearch}
-                className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 hover:text-white hover:border-slate-500 font-medium text-xs"
+                className="glass-control tv-focus flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-slate-200 hover:text-white text-xs"
               >
                 <Search className="w-3.5 h-3.5 text-amber-400" />
                 <span>Search [Y]</span>
@@ -99,7 +96,7 @@ export const RemoteControlHUD: React.FC<RemoteControlHUDProps> = ({
                   <button
                     id="hud-btn-seek-left"
                     onClick={() => onPlayerSeek?.(-10)}
-                    className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 hover:text-white text-xs font-mono"
+                    className="glass-control tv-focus flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-slate-200 hover:text-white text-xs"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-sky-400" />
                     <span>-10s</span>
@@ -108,7 +105,7 @@ export const RemoteControlHUD: React.FC<RemoteControlHUDProps> = ({
                   <button
                     id="hud-btn-seek-right"
                     onClick={() => onPlayerSeek?.(10)}
-                    className="flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 hover:text-white text-xs font-mono"
+                    className="glass-control tv-focus flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-slate-200 hover:text-white text-xs"
                   >
                     <RotateCw className="w-3.5 h-3.5 text-sky-400" />
                     <span>+10s</span>
@@ -124,7 +121,7 @@ export const RemoteControlHUD: React.FC<RemoteControlHUDProps> = ({
       <button
         id="btn-toggle-magic-remote-hud"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-950 border border-slate-700 text-slate-300 hover:text-white hover:border-sky-500 text-xs group"
+        className="glass-control tv-focus flex items-center gap-2 px-3 py-1.5 rounded-full text-slate-300 hover:text-white hover:border-sky-500 text-xs group"
       >
         <Compass className="w-3.5 h-3.5 text-sky-400" />
         <span className="font-semibold text-[11px]">Magic Remote Helper</span>
