@@ -42,6 +42,7 @@ import { VideoPlayer } from './components/VideoPlayer';
 import { ServerLoginModal } from './components/ServerLoginModal';
 import { RemoteControlHUD } from './components/RemoteControlHUD';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { ModalShell } from './components/ModalShell';
 
 export default function App() {
   const storage = useStorage();
@@ -1111,51 +1112,48 @@ export default function App() {
       <OfflineIndicator />
 
       {/* 7. TV Exit Confirmation Dialog (when back is pressed at root) */}
-      {showExitConfirm && (
-        <div
-          id="exit-confirm-modal"
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={() => setShowExitConfirm(false)}
-        >
-          <div
-            className="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl p-6 shadow-2xl space-y-5 text-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-14 h-14 mx-auto rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shadow-lg shadow-red-500/10">
-              <LogOut className="w-7 h-7" />
-            </div>
-
-            <div className="space-y-1.5">
-              <h3 className="text-xl font-bold text-white tracking-tight">Exit IPTV Player?</h3>
-              <p className="text-sm text-slate-300">
-                Are you sure you want to close and exit the application?
-              </p>
-              <p className="text-xs text-sky-400 font-mono pt-1">
-                Press Back again or select Exit
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                id="btn-exit-cancel"
-                autoFocus
-                onClick={() => setShowExitConfirm(false)}
-                className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold border border-slate-700 transition-all tv-focus"
-              >
-                Cancel [Stay]
-              </button>
-
-              <button
-                id="btn-exit-confirm"
-                onClick={handleExitApp}
-                className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold shadow-lg shadow-red-600/25 transition-all tv-focus"
-              >
-                Exit Application
-              </button>
-            </div>
-          </div>
+      <ModalShell
+        open={showExitConfirm}
+        onClose={() => setShowExitConfirm(false)}
+        overlayId="exit-confirm-modal"
+        cardId="exit-confirm-card"
+        ariaLabel="Exit application confirmation"
+        overlayClassName="z-50 bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
+        cardClassName="w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl p-6 shadow-2xl space-y-5 text-center"
+      >
+        <div className="w-14 h-14 mx-auto rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center text-red-400 shadow-lg shadow-red-500/10">
+          <LogOut className="w-7 h-7" />
         </div>
-      )}
+
+        <div className="space-y-1.5">
+          <h3 className="text-xl font-bold text-white tracking-tight">Exit IPTV Player?</h3>
+          <p className="text-sm text-slate-300">
+            Are you sure you want to close and exit the application?
+          </p>
+          <p className="text-xs text-sky-400 font-mono pt-1">
+            Press Back again or select Exit
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button
+            id="btn-exit-cancel"
+            autoFocus
+            onClick={() => setShowExitConfirm(false)}
+            className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold border border-slate-700 transition-all tv-focus"
+          >
+            Cancel [Stay]
+          </button>
+
+          <button
+            id="btn-exit-confirm"
+            onClick={handleExitApp}
+            className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-semibold shadow-lg shadow-red-600/25 transition-all tv-focus"
+          >
+            Exit Application
+          </button>
+        </div>
+      </ModalShell>
     </div>
   );
 }
