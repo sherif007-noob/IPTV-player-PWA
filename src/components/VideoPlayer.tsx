@@ -288,6 +288,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const progressRef = useRef<() => void>(() => {});
   const sessionRef = useRef(createSessionId());
   const playbackCounterRef = useRef(0);
+  const seekCursorRef = useRef(Math.max(0, initialTime));
+  const pendingSeekRef = useRef<{ target: number; resume: boolean } | null>(null);
 
   const [activeUrl, setActiveUrl] = useState('');
   const [isPlaying, setIsPlaying] = useState(true);
@@ -363,6 +365,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     initialNativeSeekRef.current = Math.max(0, initialTime);
     resumeAfterSourceChangeRef.current = true;
     setActiveUrl(next);
+    seekCursorRef.current = Math.max(0, initialTime);
+    pendingSeekRef.current = null;
     setCurrentTime(0);
     setBuffered(0);
     setDuration(getKnownDuration(item, seriesContext));
@@ -530,33 +534,55 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const seekToPosition = useCallback((requestedSeconds: number) => {
     const video = videoRef.current;
-    if (!video || isLive || !Number.isFinite(requestedSeconds)) return;
+    if (!video || isLive || !Number.isFinite(requestedSeconds)) return false;
 
     const upper = duration > 0 ? duration : Number.MAX_SAFE_INTEGER;
     const target = Math.max(0, Math.min(upper, requestedSeconds));
     const wasPlaying = !video.paused;
+
+    seekCursorRef.current = target;
 
     const seekableEnd = video.seekable.length
       ? video.seekable.end(video.seekable.length - 1)
       : 0;
 
     if (usesGeneratedHls(activeUrl) && target > seekableEnd + 0.5) {
+      pendingSeekRef.current = { target, resume: wasPlaying };
       setSeekFeedback(`Preparing ${formatTime(target)} · available to ${formatTime(seekableEnd)}`);
-      window.setTimeout(() => setSeekFeedback(null), 1800);
-      return;
+      return false;
     }
 
+    pendingSeekRef.current = null;
     try {
       video.currentTime = target;
       setCurrentTime(target);
       if (wasPlaying) safePlay();
-    } catch {}
+      return true;
+    } catch {
+      return false;
+    }
   }, [activeUrl, duration, isLive, safePlay]);
 
   const handleSeek = useCallback((delta: number) => {
-    seekToPosition(currentTime + delta);
-    setSeekFeedback(`${delta >= 0 ? '+' : ''}${delta}s`);
-    window.setTimeout(() => setSeekFeedback(null), 1000);
+    const video = videoRef.current;
+    if (!video) return;
+
+    const pending = pendingSeekRef.current?.target;
+    const mediaTime = Number(video.currentTime);
+    const base = Number.isFinite(pending)
+      ? pending!
+      : Number.isFinite(seekCursorRef.current)
+        ? seekCursorRef.current
+        : Number.isFinite(mediaTime)
+          ? mediaTime
+          : currentTime;
+
+    const target = base + delta;
+    const applied = seekToPosition(target);
+    if (applied) {
+      setSeekFeedback(`${delta >= 0 ? '+' : ''}${delta}s`);
+      window.setTimeout(() => setSeekFeedback(null), 700);
+    }
   }, [currentTime, seekToPosition]);
 
   const togglePlay = useCallback(() => {
@@ -589,24 +615,46 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const absolute = raw;
     setCurrentTime(absolute);
 
+    let seekableEnd = 0;
     if (video.seekable.length > 0) {
-      setBuffered(video.seekable.end(video.seekable.length - 1));
+      seekableEnd = video.seekable.end(video.seekable.length - 1);
+      setBuffered(seekableEnd);
     } else if (video.buffered.length > 0) {
-      setBuffered(video.buffered.end(video.buffered.length - 1));
+      seekableEnd = video.buffered.end(video.buffered.length - 1);
+      setBuffered(seekableEnd);
     }
 
-    if (initialNativeSeekRef.current > 0 && video.seekable.length > 0) {
+    const pendingSeek = pendingSeekRef.current;
+    if (pendingSeek && seekableEnd > 0) {
+      if (pendingSeek.target <= seekableEnd + 0.5) {
+        pendingSeekRef.current = null;
+        seekCursorRef.current = pendingSeek.target;
+        try { video.currentTime = pendingSeek.target; } catch {}
+        setCurrentTime(pendingSeek.target);
+        setSeekFeedback(`Jumped to ${formatTime(pendingSeek.target)}`);
+        window.setTimeout(() => setSeekFeedback(null), 900);
+        if (pendingSeek.resume) safePlay();
+      } else {
+        setSeekFeedback(
+          `Preparing ${formatTime(pendingSeek.target)} · available to ${formatTime(seekableEnd)}`
+        );
+      }
+    } else if (!pendingSeek) {
+      seekCursorRef.current = absolute;
+    }
+
+    if (initialNativeSeekRef.current > 0 && seekableEnd > 0) {
       const target = initialNativeSeekRef.current;
-      const seekableEnd = video.seekable.end(video.seekable.length - 1);
       if (target <= seekableEnd + 0.5) {
         initialNativeSeekRef.current = 0;
+        seekCursorRef.current = target;
         try { video.currentTime = target; } catch {}
       }
     }
 
     updateDurationFromMedia();
     if (absolute > 0.05) setIsBuffering(false);
-  }, [activeUrl, updateDurationFromMedia]);
+  }, [activeUrl, safePlay, updateDurationFromMedia]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
