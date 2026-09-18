@@ -142,11 +142,11 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
       overlayId="server-login-modal-overlay"
       cardId="server-login-card"
       ariaLabel="Server settings"
-      overlayClassName="z-50 bg-black/80 backdrop-blur-2xl p-4"
-      cardClassName="w-full max-w-xl max-h-[calc(100dvh-2rem)] bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col shadow-2xl shadow-black/80"
+      overlayClassName="z-50 p-4"
+      cardClassName="settings-modal-card w-full max-w-xl max-h-[calc(100dvh-2rem)] rounded-3xl overflow-hidden flex flex-col"
     >
         {/* Header */}
-        <div className="p-5 border-b border-white/10 flex items-center justify-between bg-slate-950/70 backdrop-blur-md">
+        <div className="settings-modal-header glass-surface p-5 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center shadow-lg shadow-sky-500/20">
               <Server className="w-5 h-5 text-sky-400 drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
@@ -169,7 +169,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
         </div>
 
         {/* Current Account Status Info */}
-        <div className="px-6 py-3 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-300 gap-2">
+        <div className="settings-status-strip px-6 py-3 border-b border-white/10 flex flex-wrap items-center justify-between text-xs text-slate-300 gap-2">
           <div className="flex items-center gap-2">
             <span
               className={`w-2 h-2 rounded-full ${
@@ -216,7 +216,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
               value={server}
               onChange={(e) => setServer(e.target.value)}
               placeholder="http://iptv-provider.net:8080"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 font-mono"
+              className="settings-field glass-control w-full rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-500 font-mono"
             />
             <p className="text-[11px] text-slate-400">
               Example: http://domain.com:8080 (without player_api.php)
@@ -236,7 +236,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Your username"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-500"
+                className="settings-field glass-control w-full rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-500"
               />
             </div>
 
@@ -251,13 +251,13 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-500"
+                className="settings-field glass-control w-full rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-500"
               />
             </div>
           </div>
 
           {/* Automated Refresh Mechanism */}
-          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+          <div className="glass-surface p-3.5 rounded-xl space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 text-sky-400" />
@@ -269,7 +269,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
                 id="select-auto-refresh"
                 value={autoRefreshHours}
                 onChange={(e) => setAutoRefreshHours(Number(e.target.value))}
-                className="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-sky-500"
+                className="glass-control text-xs text-slate-200 rounded-lg px-2.5 py-1 focus:outline-none focus:border-sky-500"
               >
                 <option value={4}>Every 4 Hours</option>
                 <option value={6}>Every 6 Hours</option>
@@ -325,7 +325,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
                         value={userAgent}
                         onChange={(e) => setUserAgent(e.target.value)}
                         placeholder="e.g. VLC/3.0.18 LibVLC/3.0.18"
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
+                        className="settings-field glass-control w-full rounded-lg px-3 py-2 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                       />
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
@@ -336,7 +336,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
                           value={referer}
                           onChange={(e) => setReferer(e.target.value)}
                           placeholder="e.g. http://player.com"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
+                          className="settings-field glass-control w-full rounded-lg px-3 py-2 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                         />
                       </div>
                       <div className="flex-1 space-y-1.5">
@@ -346,7 +346,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
                           value={origin}
                           onChange={(e) => setOrigin(e.target.value)}
                           placeholder="e.g. http://player.com"
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
+                          className="settings-field glass-control w-full rounded-lg px-3 py-2 text-white text-xs placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-sky-500/50"
                         />
                       </div>
                     </div>
@@ -430,7 +430,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
               type="button"
               id="btn-switch-demo"
               onClick={handleSwitchToDemo}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 tv-focus"
+              className="glass-control w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl hover:bg-slate-700/65 text-slate-300 text-xs font-semibold tv-focus"
             >
               <PlayCircle className="w-4 h-4 text-amber-400" />
               <span>Use 4K Demo Mode</span>
@@ -440,7 +440,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 tv-focus"
+                className="glass-control flex-1 sm:flex-none px-4 py-2.5 rounded-xl hover:bg-slate-700/65 text-slate-300 text-xs font-semibold tv-focus"
               >
                 Cancel
               </button>
