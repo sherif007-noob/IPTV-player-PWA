@@ -810,7 +810,7 @@ export default function App() {
       />
 
       {/* 2. Main Body Area */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div id="app-main-body" className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* If Home Starting Page is Active AND no search is being typed */}
         {currentView === 'home' && !headerSearchQuery.trim() ? (
           <HomePortal
@@ -833,7 +833,19 @@ export default function App() {
                     id="sidebar-mobile-backdrop"
                     className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 md:hidden"
                     aria-hidden="true"
-                    onPointerDown={() => setIsSidebarOpen(false)}
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onPointerUp={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setIsSidebarOpen(false);
+                    }}
                   />
                 )}
 
@@ -893,7 +905,7 @@ export default function App() {
             )}
 
             {/* Content Stage Grid */}
-            <main className="min-w-0 min-h-0 flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-[#0b0e14] to-slate-950">
+            <main className="library-content-stage min-w-0 min-h-0 flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-[#0b0e14] to-slate-950">
               {/* Section Subheader / Breadcrumb */}
               <div className="library-subheader min-h-12 flex-wrap gap-2 py-2 px-3 sm:px-6 border-b border-slate-850 flex items-center justify-between shrink-0 bg-slate-950/40">
                 <div className="library-breadcrumb flex items-center gap-2 text-xs">
