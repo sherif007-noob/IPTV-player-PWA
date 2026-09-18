@@ -100,16 +100,10 @@ async function readFromAll<T extends { category_id: string }>(
     }
   }
 
-  const all = await readCatalog<T[]>(provider, kind, 'all');
-  if (!all?.data?.length) return null;
-  if (!xtreamService.getIsDemo() && matchesMockCatalog(kind, all.data as any[])) {
-    await clearCatalogs(provider);
-    return null;
-  }
-  rememberHot(provider, kind, 'all', all.data, all.updatedAt);
-  const filtered = all.data.filter((item) => item.category_id === categoryId);
-  if (filtered.length) rememberHot(provider, kind, categoryId, filtered, all.updatedAt);
-  return filtered;
+  // Do not deserialize a huge persistent "all" catalog just to serve one
+  // category. If All is already hot, filtering above is cheap; otherwise let
+  // the provider's category endpoint populate a compact exact cache.
+  return null;
 }
 
 xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMovie[]> => {
