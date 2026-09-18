@@ -96,6 +96,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
   return (
     <header
       id="app-top-header"
+      aria-label="Primary navigation"
       className="app-header h-16 px-3 sm:px-6 bg-slate-950/85 backdrop-blur-xl border-b border-white/10 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0 select-none shadow-lg shadow-black/40"
     >
       {/* Brand & Home Navigation */}
@@ -106,8 +107,14 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           data-skip-spatial="false"
           onClick={onToggleSidebar}
           onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-          title={isSidebarOpen && currentView !== 'home' ? 'Hide sidebar' : 'Show categories sidebar'}
-          aria-label="Toggle categories sidebar"
+          title={currentView === 'home'
+            ? 'Browse Live TV categories'
+            : isSidebarOpen
+            ? 'Hide categories'
+            : 'Show categories'}
+          aria-label={currentView === 'home' ? 'Browse Live TV categories' : 'Toggle categories sidebar'}
+          aria-controls="category-sidebar-wrapper"
+          aria-expanded={currentView !== 'home' ? isSidebarOpen : false}
           className={`flex items-center justify-center p-2 rounded-xl border tv-focus transition-all duration-200 ${
             isSidebarOpen && currentView !== 'home'
               ? 'bg-sky-500/20 text-sky-400 border-sky-400/50 shadow-sm shadow-sky-500/20'
@@ -194,6 +201,12 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                if (searchQuery) onSearchChange('');
+                else inputRef.current?.blur();
+              }
+            }}
             placeholder={searchPlaceholder}
             className="w-full bg-slate-900/70 backdrop-blur-md border border-white/10 rounded-xl pl-9 pr-16 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-sky-400 focus:shadow-[0_0_15px_rgba(56,189,248,0.25)] font-medium transition-all duration-200"
           />
@@ -245,6 +258,12 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
             id="btn-header-font-size"
             data-skip-spatial="true"
             onClick={() => setIsFontMenuOpen(!isFontMenuOpen)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setIsFontMenuOpen(false);
+            }}
+            aria-haspopup="menu"
+            aria-expanded={isFontMenuOpen}
+            aria-controls="font-size-dropdown-menu"
             title="TV Screen Font Scale & Readability"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-semibold"
           >
@@ -258,6 +277,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           {isFontMenuOpen && (
             <div
               id="font-size-dropdown-menu"
+              role="menu"
               className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col space-y-1"
             >
               <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800">
@@ -269,6 +289,8 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
                   <button
                     key={opt.id}
                     id={`btn-font-opt-${opt.id}`}
+                    role="menuitemradio"
+                    aria-checked={isSelected}
                     onClick={() => {
                       if (onSelectFontSize) {
                         onSelectFontSize(opt.id);
