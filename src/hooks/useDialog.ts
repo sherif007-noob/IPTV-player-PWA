@@ -51,6 +51,7 @@ export function useDialog(open: boolean, onClose: () => void) {
     window.addEventListener('keydown', onKey, true);
     document.addEventListener('focusin', onFocus);
     return () => {
+      const wasTopmost = isTopmost();
       window.removeEventListener('keydown', onKey, true);
       document.removeEventListener('focusin', onFocus);
       openDialogCount = Math.max(0, openDialogCount - 1);
@@ -58,7 +59,18 @@ export function useDialog(open: boolean, onClose: () => void) {
         document.body.style.overflow = previousBodyOverflow;
         document.documentElement.classList.remove('modal-open');
       }
-      if (previous?.isConnected) previous.focus({ preventScroll: true });
+
+      if (wasTopmost) {
+        window.requestAnimationFrame(() => {
+          const dialogs = document.querySelectorAll<HTMLElement>('[aria-modal="true"]');
+          const remainingTop = dialogs[dialogs.length - 1];
+          if (previous?.isConnected && (!remainingTop || remainingTop.contains(previous))) {
+            previous.focus({ preventScroll: true });
+          } else if (remainingTop?.isConnected) {
+            remainingTop.focus({ preventScroll: true });
+          }
+        });
+      }
     };
   }, [open]);
   return ref;
