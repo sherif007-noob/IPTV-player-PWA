@@ -96,10 +96,10 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
   return (
     <header
       id="app-top-header"
-      className="h-16 px-3 sm:px-6 bg-slate-950/85 backdrop-blur-xl border-b border-white/10 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0 select-none shadow-lg shadow-black/40"
+      className="app-header h-16 px-3 sm:px-6 bg-slate-950/85 backdrop-blur-xl border-b border-white/10 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0 select-none shadow-lg shadow-black/40"
     >
       {/* Brand & Home Navigation */}
-      <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+      <div className="app-header-primary flex items-center gap-1.5 sm:gap-3 shrink-0">
         {/* Hamburger Menu Button to Toggle Categories Sidebar */}
         <button
           id="btn-header-hamburger"
@@ -136,8 +136,28 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           <span className="text-xs font-semibold hidden sm:inline">Home</span>
         </button>
 
+
+        <div className="app-header-mobile-title hidden min-w-0">
+          <span className="block truncate text-sm font-bold text-white">
+            {currentView === 'home'
+              ? 'Home'
+              : currentView === 'vod'
+              ? 'Movies'
+              : currentView === 'series'
+              ? 'Series'
+              : currentView === 'live'
+              ? 'Live TV'
+              : currentView === 'continue_watching'
+              ? 'Continue'
+              : currentView.charAt(0).toUpperCase() + currentView.slice(1)}
+          </span>
+          {selectedCategoryName && currentView !== 'home' && (
+            <span className="block truncate text-[10px] text-sky-400">{selectedCategoryName}</span>
+          )}
+        </div>
+
         {/* Section Quick Switcher Chips */}
-        <div className="flex items-center gap-1 sm:gap-1.5 border-l border-white/10 pl-1.5 sm:pl-3">
+        <div className="app-header-tabs flex items-center gap-1 sm:gap-1.5 border-l border-white/10 pl-1.5 sm:pl-3">
           {sections.map((sec) => {
             const Icon = sec.icon;
             const isActive = currentView === sec.id;
@@ -163,7 +183,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
       </div>
 
       {/* Center: Prominent Searchbar directly in the Header */}
-      <div className="flex-1 max-w-md sm:max-w-lg relative">
+      <div className="app-header-search flex-1 max-w-md sm:max-w-lg relative">
         <div className="relative flex items-center w-full">
           <Search className="w-4 h-4 text-sky-400 absolute left-3 pointer-events-none" />
           <input
@@ -199,7 +219,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
       </div>
 
       {/* Right Controls: Refresh, Font Size Dropdown, Settings, PWA Install, HW Decode Badge */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="app-header-actions flex items-center gap-2 shrink-0">
         <PWAInstallButton variant="header" />
 
         {/* Refresh Content Button */}
