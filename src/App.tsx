@@ -878,8 +878,8 @@ export default function App() {
             {/* Content Stage Grid */}
             <main className="min-w-0 min-h-0 flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-[#0b0e14] to-slate-950">
               {/* Section Subheader / Breadcrumb */}
-              <div className="min-h-12 flex-wrap gap-2 py-2 px-3 sm:px-6 border-b border-slate-850 flex items-center justify-between shrink-0 bg-slate-950/40">
-                <div className="flex items-center gap-2 text-xs">
+              <div className="library-subheader min-h-12 flex-wrap gap-2 py-2 px-3 sm:px-6 border-b border-slate-850 flex items-center justify-between shrink-0 bg-slate-950/40">
+                <div className="library-breadcrumb flex items-center gap-2 text-xs">
                   <button
                     onClick={handleNavigateHome}
                     className="text-slate-400 hover:text-white"
@@ -907,7 +907,7 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="library-subheader-actions flex items-center gap-3">
                   {/* Clear Button above titles for Favorites, Watchlist, and Continue Watching / Watch Again */}
                   {(selectedCategoryId === 'special_favorites' ||
                     selectedCategoryId === 'special_continue' ||
