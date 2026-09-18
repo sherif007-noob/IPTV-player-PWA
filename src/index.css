@@ -1,5 +1,80 @@
 @import "tailwindcss";
 
+/*
+ * IPTV Player design-system tokens
+ * ---------------------------------
+ * Obsidian canvas + restrained dark glass + electric sky focus.
+ * Components should consume semantic classes/tokens below instead of inventing
+ * new rgba/blur/glow values. Strong cyan is reserved for focus, active state,
+ * and playback progress.
+ */
+:root {
+  /* Canvas / text */
+  --ds-canvas: #07090e;
+  --ds-canvas-raised: #0b0e14;
+  --ds-text-primary: #f8fafc;
+  --ds-text-secondary: #cbd5e1;
+  --ds-text-muted: #94a3b8;
+
+  /* Glass surfaces */
+  --ds-glass-chrome: rgba(7, 12, 26, 0.58);
+  --ds-glass-panel: rgba(15, 23, 42, 0.62);
+  --ds-glass-control: rgba(15, 23, 42, 0.54);
+  --ds-glass-modal: rgba(15, 23, 42, 0.70);
+  --ds-glass-backdrop: rgba(2, 6, 23, 0.32);
+  --ds-glass-border: rgba(255, 255, 255, 0.10);
+  --ds-glass-border-soft: rgba(255, 255, 255, 0.07);
+  --ds-glass-highlight: rgba(255, 255, 255, 0.05);
+
+  /* Accent / semantic glow */
+  --ds-sky: #38bdf8;
+  --ds-sky-strong: #0ea5e9;
+  --ds-indigo: #818cf8;
+  --ds-violet: #a78bfa;
+  --ds-amber: #fbbf24;
+  --ds-emerald: #34d399;
+  --ds-rose: #fb7185;
+
+  --ds-glow-sky-soft: 0 4px 20px rgba(56, 189, 248, 0.20);
+  --ds-glow-sky: 0 0 25px rgba(56, 189, 248, 0.50);
+  --ds-glow-sky-inset: inset 0 0 15px rgba(56, 189, 248, 0.15);
+  --ds-glow-indigo-soft: 0 0 24px rgba(129, 140, 248, 0.22);
+
+  /* Depth */
+  --ds-shadow-control: 0 8px 24px rgba(0, 0, 0, 0.24);
+  --ds-shadow-panel: 0 14px 42px rgba(0, 0, 0, 0.34);
+  --ds-shadow-modal: 0 22px 70px rgba(0, 0, 0, 0.52);
+
+  /* Blur / saturation */
+  --ds-blur-control: 14px;
+  --ds-blur-panel: 18px;
+  --ds-blur-chrome: 22px;
+  --ds-blur-modal: 22px;
+  --ds-saturate-glass: 145%;
+
+  /* Shape */
+  --ds-radius-control: 0.75rem;
+  --ds-radius-card: 1rem;
+  --ds-radius-panel: 1.25rem;
+  --ds-radius-modal: 1.5rem;
+
+  /* Motion */
+  --ds-motion-fast: 150ms;
+  --ds-motion-normal: 300ms;
+  --ds-motion-slow: 500ms;
+  --ds-ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --ds-ease-standard: ease-out;
+
+  /* Interaction geometry */
+  --ds-focus-scale: 1.02;
+  --ds-card-hover-scale: 1.03;
+  --ds-card-hover-lift: -0.25rem;
+  --ds-image-hover-scale: 1.08;
+  --ds-home-icon-hover-scale: 1.10;
+  --ds-touch-press-scale: 0.985;
+  --ds-touch-target: 44px;
+}
+
 html[data-tv-font="small"], :root[data-tv-font="small"] {
   font-size: 100% !important;
 }
@@ -18,8 +93,8 @@ html[data-tv-font="maximum"], :root[data-tv-font="maximum"] {
 
 @layer base {
   body {
-    background-color: #07090e;
-    color: #e2e8f0;
+    background-color: var(--ds-canvas);
+    color: var(--ds-text-secondary);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     user-select: none;
     -webkit-user-select: none;
@@ -32,48 +107,118 @@ html[data-tv-font="maximum"], :root[data-tv-font="maximum"] {
   }
 }
 
-/* Frosted Glass UI Classes */
+/* Semantic visual primitives. Keep aliases for existing components. */
+.glass-chrome,
 .glass-panel {
-  background: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  background: var(--ds-glass-chrome);
+  -webkit-backdrop-filter: blur(var(--ds-blur-chrome)) saturate(var(--ds-saturate-glass));
+  backdrop-filter: blur(var(--ds-blur-chrome)) saturate(var(--ds-saturate-glass));
+  border: 1px solid var(--ds-glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--ds-glass-highlight),
+    var(--ds-shadow-panel);
+}
+
+.glass-surface {
+  background: var(--ds-glass-panel);
+  -webkit-backdrop-filter: blur(var(--ds-blur-panel)) saturate(var(--ds-saturate-glass));
+  backdrop-filter: blur(var(--ds-blur-panel)) saturate(var(--ds-saturate-glass));
+  border: 1px solid var(--ds-glass-border);
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), var(--ds-shadow-panel);
+}
+
+.glass-control {
+  background: var(--ds-glass-control);
+  -webkit-backdrop-filter: blur(var(--ds-blur-control)) saturate(140%);
+  backdrop-filter: blur(var(--ds-blur-control)) saturate(140%);
+  border: 1px solid var(--ds-glass-border);
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), var(--ds-shadow-control);
+}
+
+.glass-modal {
+  background: var(--ds-glass-modal);
+  -webkit-backdrop-filter: blur(var(--ds-blur-modal)) saturate(var(--ds-saturate-glass));
+  backdrop-filter: blur(var(--ds-blur-modal)) saturate(var(--ds-saturate-glass));
+  border: 1px solid var(--ds-glass-border);
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), var(--ds-shadow-modal);
 }
 
 .glass-card {
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--ds-glass-panel);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+  backdrop-filter: blur(12px) saturate(135%);
+  border: 1px solid var(--ds-glass-border-soft);
+  transition:
+    transform var(--ds-motion-normal) var(--ds-ease-standard),
+    border-color var(--ds-motion-normal) var(--ds-ease-standard),
+    box-shadow var(--ds-motion-normal) var(--ds-ease-standard),
+    background-color var(--ds-motion-normal) var(--ds-ease-standard);
 }
 
-.glass-card:hover, .glass-card:focus-visible, .glass-card:focus {
-  background: rgba(30, 41, 59, 0.8);
-  border-color: rgba(56, 189, 248, 0.5);
-  box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.6), 0 0 24px 0 rgba(56, 189, 248, 0.25);
-  transform: translateY(-2px) scale(1.02);
+@media (hover: hover) and (pointer: fine) {
+  .glass-card:hover,
+  .glass-card:focus-visible,
+  .glass-card:focus {
+    background: rgba(30, 41, 59, 0.76);
+    border-color: rgba(56, 189, 248, 0.50);
+    box-shadow: 0 12px 36px -8px rgba(0, 0, 0, 0.60), 0 0 24px rgba(56, 189, 248, 0.25);
+  }
 }
 
-/* TV Focus ring highlight: elegant glowing focus state */
+/* Remote/keyboard focus is a product-wide primitive, not a component detail. */
+.neon-focus,
 .tv-focus {
   outline: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s var(--ds-ease-premium);
 }
 
+.neon-focus:focus-visible,
+.neon-focus:focus,
 .tv-focus:focus-visible,
 .tv-focus:focus {
-  outline: 2px solid #38bdf8 !important;
+  outline: 2px solid var(--ds-sky) !important;
   outline-offset: 2px !important;
-  box-shadow: 0 0 25px rgba(56, 189, 248, 0.5), inset 0 0 15px rgba(56, 189, 248, 0.15) !important;
-  transform: scale(1.02);
+  box-shadow: var(--ds-glow-sky), var(--ds-glow-sky-inset) !important;
+  transform: scale(var(--ds-focus-scale));
   z-index: 10;
 }
 
-.tv-focus:hover:not(:focus) {
-  border-color: rgba(56, 189, 248, 0.6);
-  box-shadow: 0 4px 20px rgba(56, 189, 248, 0.2);
+@media (hover: hover) and (pointer: fine) {
+  .neon-focus:hover:not(:focus),
+  .tv-focus:hover:not(:focus) {
+    border-color: rgba(56, 189, 248, 0.60);
+    box-shadow: var(--ds-glow-sky-soft);
+  }
+}
+
+/* Shared motion primitive for cards/content objects. */
+.interactive-card {
+  transform-origin: center;
+  transition:
+    transform var(--ds-motion-normal) var(--ds-ease-standard),
+    border-color var(--ds-motion-normal) var(--ds-ease-standard),
+    box-shadow var(--ds-motion-normal) var(--ds-ease-standard),
+    background-color var(--ds-motion-normal) var(--ds-ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .interactive-card:hover {
+    transform: translateY(var(--ds-card-hover-lift)) scale(var(--ds-card-hover-scale));
+  }
+  .interactive-card img {
+    transition: transform var(--ds-motion-slow) var(--ds-ease-standard);
+  }
+  .interactive-card:hover img,
+  .interactive-card:focus-visible img {
+    transform: scale(var(--ds-image-hover-scale));
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  .interactive-card:active {
+    transform: scale(var(--ds-touch-press-scale));
+    transition-duration: 120ms;
+  }
 }
 
 /* Custom glowing TV scrollbars */
@@ -1103,33 +1248,33 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 }
 
 
-/* Final visual contract: original neon TV language + true dark frosted glass. */
+/* Compatibility aliases while component migration proceeds in later passes. */
 :root {
-  --glass-obsidian: rgba(7, 12, 26, 0.58);
-  --glass-panel: rgba(15, 23, 42, 0.62);
-  --glass-control: rgba(15, 23, 42, 0.54);
-  --glass-border: rgba(255, 255, 255, 0.10);
-  --glass-highlight: rgba(255, 255, 255, 0.05);
-  --glass-shadow: 0 14px 42px rgba(0, 0, 0, 0.34);
+  --glass-obsidian: var(--ds-glass-chrome);
+  --glass-panel: var(--ds-glass-panel);
+  --glass-control: var(--ds-glass-control);
+  --glass-border: var(--ds-glass-border);
+  --glass-highlight: var(--ds-glass-highlight);
+  --glass-shadow: var(--ds-shadow-panel);
 }
 
 /* Header / drawer / modal glass. */
 .app-header {
-  background: var(--glass-obsidian) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(145%);
-  backdrop-filter: blur(22px) saturate(145%);
-  border-color: var(--glass-border) !important;
-  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 34px rgba(0, 0, 0, 0.32) !important;
+  background: var(--ds-glass-chrome) !important;
+  -webkit-backdrop-filter: blur(var(--ds-blur-chrome)) saturate(var(--ds-saturate-glass));
+  backdrop-filter: blur(var(--ds-blur-chrome)) saturate(var(--ds-saturate-glass));
+  border-color: var(--ds-glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), 0 10px 34px rgba(0, 0, 0, 0.32) !important;
 }
 #category-sidebar-panel {
   background: rgba(7, 12, 26, 0.60) !important;
   -webkit-backdrop-filter: blur(24px) saturate(150%);
   backdrop-filter: blur(24px) saturate(150%);
-  border-color: var(--glass-border) !important;
+  border-color: var(--ds-glass-border) !important;
   box-shadow: inset -1px 0 0 rgba(255,255,255,.035), 16px 0 44px rgba(0,0,0,.35) !important;
 }
 #sidebar-mobile-backdrop {
-  background: rgba(2, 6, 23, 0.32);
+  background: var(--ds-glass-backdrop);
   -webkit-backdrop-filter: blur(5px) saturate(120%);
   backdrop-filter: blur(5px) saturate(120%);
 }
@@ -1145,11 +1290,11 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   backdrop-filter: blur(8px) saturate(125%);
 }
 .modal-shell-card {
-  background: rgba(15, 23, 42, 0.70) !important;
-  -webkit-backdrop-filter: blur(22px) saturate(145%);
-  backdrop-filter: blur(22px) saturate(145%);
-  border-color: var(--glass-border) !important;
-  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 22px 70px rgba(0,0,0,.52) !important;
+  background: var(--ds-glass-modal) !important;
+  -webkit-backdrop-filter: blur(var(--ds-blur-chrome)) saturate(var(--ds-saturate-glass));
+  backdrop-filter: blur(var(--ds-blur-chrome)) saturate(var(--ds-saturate-glass));
+  border-color: var(--ds-glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), 0 22px 70px rgba(0,0,0,.52) !important;
 }
 
 /* Floating controls keep a compact visual object while their hit target may be larger. */
@@ -1160,8 +1305,8 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 #btn-header-settings {
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   backdrop-filter: blur(14px) saturate(140%);
-  border-color: var(--glass-border) !important;
-  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px rgba(0,0,0,.24);
+  border-color: var(--ds-glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), 0 8px 24px rgba(0,0,0,.24);
 }
 
 /* Preserve the original TV focus signature exactly. */
@@ -1171,11 +1316,11 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 }
 .tv-focus:focus,
 .tv-focus:focus-visible {
-  outline: 2px solid #38bdf8 !important;
+  outline: 2px solid var(--ds-sky) !important;
   outline-offset: 2px !important;
   box-shadow: 0 0 25px rgba(56, 189, 248, 0.5),
               inset 0 0 15px rgba(56, 189, 248, 0.15) !important;
-  transform: scale(1.02);
+  transform: scale(var(--ds-focus-scale));
   z-index: 10;
 }
 
@@ -1221,23 +1366,23 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 /* Player OSD: glass controls and deterministic 300ms fade. */
 #video-player .player-top,
 #video-player .player-bottom {
-  transition: opacity 300ms ease !important;
+  transition: opacity var(--ds-motion-normal) var(--ds-ease-standard) !important;
 }
 #video-player .player-top button,
 #video-player .player-bottom button:not([aria-label="Play"]):not([aria-label="Pause"]),
 #video-player .player-bottom select,
 #video-player .player-episodes button {
-  background-color: var(--glass-control) !important;
+  background-color: var(--ds-glass-control) !important;
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   backdrop-filter: blur(14px) saturate(140%);
-  border-color: var(--glass-border) !important;
-  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 22px rgba(0,0,0,.28);
+  border-color: var(--ds-glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), 0 8px 22px rgba(0,0,0,.28);
 }
 #video-player .player-episodes {
   background: rgba(7, 12, 26, .68) !important;
   -webkit-backdrop-filter: blur(20px) saturate(145%);
   backdrop-filter: blur(20px) saturate(145%);
-  border-color: var(--glass-border) !important;
+  border-color: var(--ds-glass-border) !important;
 }
 
 /* Scrubber thumb: reveal on hover/focus for fine pointers, always visible on touch. */
