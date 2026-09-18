@@ -32,7 +32,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
   return (
     <div
       id={overlayId}
-      className={`modal-shell fixed inset-0 flex items-center justify-center overflow-hidden ${overlayClassName}`}
+      className={`modal-shell glass-backdrop fixed inset-0 flex items-center justify-center overflow-hidden ${overlayClassName}`}
       onPointerDown={(event) => {
         backdropStartedRef.current = event.target === event.currentTarget;
       }}
@@ -57,7 +57,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
         aria-modal="true"
         aria-label={ariaLabel}
         tabIndex={-1}
-        className={`modal-shell-card min-w-0 min-h-0 ${cardClassName}`}
+        className={`modal-shell-card glass-modal min-w-0 min-h-0 ${cardClassName}`}
       >
         {children}
       </div>
