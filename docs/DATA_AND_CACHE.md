@@ -130,3 +130,25 @@ Home scroll position uses the same lightweight localStorage restoration path as 
 ## Lightweight catalog counts
 
 Releasing full VOD/Series arrays must not make the Home dashboard forget the last known catalog sizes. The app stores only `vod` and `series` counts plus the provider identity in `iptv_catalog_counts_v1`. Counts are refreshed whenever a full catalog is successfully loaded and reset when the configured provider identity changes.
+
+
+## Detail request cache
+
+VOD and Series detail payloads are guarded separately from catalog persistence.
+
+- cache/dedupe keys are provider-scoped: normalized server + username + numeric content ID
+- successful detail payloads are cached for 5 minutes
+- null/error cooldown is short so temporary provider failures do not become sticky
+- caches are bounded and prune expired entries
+- pending entries are preserved while pruning so active request dedupe remains valid
+
+This prevents two providers that reuse the same numeric content ID from sharing detail metadata.
+
+## Invalidation generations
+
+Catalog persistence uses two independent generations:
+
+- **memory generation** changes when large catalog RAM is intentionally released during navigation/search cleanup; late useful requests may still persist to IndexedDB but cannot repopulate released hot/service RAM
+- **persistence generation** changes on explicit persistent invalidation/manual refresh; requests started before that invalidation are not allowed to write stale results back into IndexedDB
+
+In-flight dedupe cleanup is Promise-identity-safe, so an older request settling after invalidation cannot delete a newer request registered under the same key.
