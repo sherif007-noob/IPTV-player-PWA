@@ -105,3 +105,10 @@ IndexedDB helpers intentionally degrade gracefully. If IndexedDB is unavailable 
 The app does not keep full VOD/Series catalogs in RAM merely to show Favorites, Watchlist, or Continue Watching. Those special lists are rendered directly from lightweight persisted user state.
 
 Home's "search all library titles" behavior is lazy: the first active Home search loads missing full VOD/Series catalogs on demand (using hot cache / IndexedDB first). Catalog arrays loaded only for that Home search are released from React state when the search ends, while IndexedDB remains available for fast reuse.
+
+
+## Continue Watching storage
+
+Episode progress is retained per episode so Details can calculate/resume episode-level state. User-facing Continue Watching grids collapse multiple episode records from the same Series into one Series card, using the newest stored order.
+
+Playback progress mutations synchronously write the updated progress list to localStorage. The normal React persistence effect remains as a backup, but iOS background/pagehide safety does not depend on that later effect running.
