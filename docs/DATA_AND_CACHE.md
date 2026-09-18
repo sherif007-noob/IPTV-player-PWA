@@ -8,9 +8,9 @@ Large VOD/Series catalogs are not eagerly preloaded at startup.
 
 The catalog lookup order is:
 
-1. in-memory Xtream service cache (when already populated by the underlying service)
-2. IndexedDB persistent catalog wrapper
-3. Xtream provider network
+1. wrapper hot-memory catalog cache
+2. IndexedDB persistent catalog cache
+3. wrapped Xtream service / provider network
 
 The persistence wrapper is enabled in `src/main.tsx` by importing `src/catalogPersistence.ts`.
 
@@ -47,8 +47,9 @@ Persistent catalog TTL is currently **6 hours**.
 If a cached exact catalog exists:
 
 - return it immediately
-- if stale, start a background refresh
-- replace persistent data after a successful refresh
+- keep a hot in-memory copy for repeated reads without another IndexedDB transaction
+- if stale, invalidate the wrapped service RAM cache and start a background provider refresh
+- replace hot + persistent data after a successful refresh
 
 If a category-specific cache is missing but an `all` catalog exists, category data may be derived locally by filtering `category_id`.
 
@@ -97,3 +98,10 @@ Do **not** blindly runtime-cache Xtream provider API calls or streaming endpoint
 ## Failure behavior
 
 IndexedDB helpers intentionally degrade gracefully. If IndexedDB is unavailable or errors, catalog loading falls back to normal network/service behavior rather than making the app unusable.
+
+
+## Full-library search and special lists
+
+The app does not keep full VOD/Series catalogs in RAM merely to show Favorites, Watchlist, or Continue Watching. Those special lists are rendered directly from lightweight persisted user state.
+
+Home's "search all library titles" behavior is lazy: the first active Home search loads missing full VOD/Series catalogs on demand (using hot cache / IndexedDB first). Catalog arrays loaded only for that Home search are released from React state when the search ends, while IndexedDB remains available for fast reuse.
