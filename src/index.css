@@ -1851,3 +1851,28 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 #btn-load-more-titles {
   background: var(--ds-glass-control) !important;
 }
+
+
+/* Global primary action primitive: strong sky is reserved for intentional actions. */
+.primary-action {
+  background: linear-gradient(135deg, var(--ds-sky-strong), var(--ds-sky)) !important;
+  color: white;
+  border: 1px solid rgba(125, 211, 252, 0.70) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.16),
+    0 8px 24px rgba(14, 165, 233, .24),
+    0 0 18px rgba(56, 189, 248, .14);
+  transition:
+    transform var(--ds-motion-fast) var(--ds-ease-premium),
+    box-shadow var(--ds-motion-fast) ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .primary-action:hover {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.18),
+      0 10px 28px rgba(14, 165, 233, .30),
+      0 0 22px rgba(56, 189, 248, .20);
+  }
+}
