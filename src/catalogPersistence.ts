@@ -1,6 +1,6 @@
 import { xtreamService } from './services/xtream';
 import { readCatalog, writeCatalog, clearCatalogs } from './services/catalogStore';
-import { VodMovie, SeriesItem } from './types';
+import { ContentType, LiveChannel, SeriesItem, VodMovie, XtreamCategory } from './types';
 import { MOCK_MOVIES, MOCK_SERIES } from './services/mockData';
 
 const TTL_MS = 6 * 60 * 60 * 1000;
@@ -56,6 +56,8 @@ async function persistRealCatalog<T>(
   }
 }
 
+const originalCategories = xtreamService.getCategories.bind(xtreamService);
+const originalLive = xtreamService.getLiveStreams.bind(xtreamService);
 const originalVod = xtreamService.getVodStreams.bind(xtreamService);
 const originalSeries = xtreamService.getSeries.bind(xtreamService);
 
@@ -65,6 +67,26 @@ function providerKey() {
   const username = credentials?.username || 'anonymous';
   return `${server}::${username}`;
 }
+
+function assertSameProvider(expectedProvider: string) {
+  if (expectedProvider === providerKey()) return;
+  xtreamService.clearCache();
+  throw new Error('Provider changed while catalog request was in flight.');
+}
+
+xtreamService.getCategories = async (type: ContentType): Promise<XtreamCategory[]> => {
+  const provider = providerKey();
+  const data = await originalCategories(type);
+  assertSameProvider(provider);
+  return data;
+};
+
+xtreamService.getLiveStreams = async (categoryId: string = 'all'): Promise<LiveChannel[]> => {
+  const provider = providerKey();
+  const data = await originalLive(categoryId);
+  assertSameProvider(provider);
+  return data;
+};
 
 async function deduped<T>(
   key: string,
@@ -123,6 +145,7 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
   if (hot?.data?.length && Date.now() - hot.updatedAt <= TTL_MS) return hot.data;
 
   const exact = await readCatalog<VodMovie[]>(provider, 'vod', key);
+  assertSameProvider(provider);
   if (
     exact?.data?.length &&
     (xtreamService.getIsDemo() || !matchesMockCatalog('vod', exact.data))
@@ -148,6 +171,7 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
   }
 
   const filtered = await readFromAll<VodMovie>(provider, 'vod', key);
+  assertSameProvider(provider);
   if (filtered?.length) return filtered;
 
   const requestGeneration = memoryGeneration;
@@ -157,6 +181,7 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
     () => originalVod(key),
     (result) => persistRealCatalog(provider, 'vod', key, result, requestGeneration, requestPersistenceGeneration)
   );
+  assertSameProvider(provider);
   if (!xtreamService.getIsDemo() && matchesMockCatalog('vod', data)) {
     throw new Error('VOD provider request failed; demo fallback was rejected.');
   }
@@ -171,6 +196,7 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   if (hot?.data?.length && Date.now() - hot.updatedAt <= TTL_MS) return hot.data;
 
   const exact = await readCatalog<SeriesItem[]>(provider, 'series', key);
+  assertSameProvider(provider);
   if (
     exact?.data?.length &&
     (xtreamService.getIsDemo() || !matchesMockCatalog('series', exact.data))
@@ -194,6 +220,7 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   }
 
   const filtered = await readFromAll<SeriesItem>(provider, 'series', key);
+  assertSameProvider(provider);
   if (filtered?.length) return filtered;
 
   const requestGeneration = memoryGeneration;
@@ -203,6 +230,7 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
     () => originalSeries(key),
     (result) => persistRealCatalog(provider, 'series', key, result, requestGeneration, requestPersistenceGeneration)
   );
+  assertSameProvider(provider);
   if (!xtreamService.getIsDemo() && matchesMockCatalog('series', data)) {
     throw new Error('Series provider request failed; demo fallback was rejected.');
   }
