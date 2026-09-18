@@ -193,3 +193,6 @@ The last Pass 6 review identified and fixed two additional stale-data hazards:
 - Categories and Live requests now capture provider identity before awaiting the underlying Xtream service. If credentials change before the request resolves, the result is rejected and the unscoped service cache is cleared.
 - VOD/Series wrapper reads perform the same provider-identity checks after asynchronous IndexedDB/network boundaries.
 - Successful Settings/Demo provider transitions invalidate active request generations, clear heavy React arrays/hot/service/persistent catalogs, reset provider-scoped counts, and reload only the active non-special section.
+
+
+- Provider transition now clears React Live/category state as well as VOD/Series. Home immediately reloads the new provider's Live categories/count source; special lists reload only lightweight categories.
