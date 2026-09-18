@@ -149,7 +149,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           className={`header-control header-icon-control-mobile flex items-center justify-center p-2 rounded-xl border tv-focus transition-all duration-200 ${
             isSidebarOpen && currentView !== 'home'
               ? 'bg-sky-500/20 text-sky-400 border-sky-400/50 shadow-sm shadow-sky-500/20'
-              : 'bg-slate-900/70 backdrop-blur-md border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
+              : 'glass-control text-slate-300 hover:text-white hover:bg-slate-800/70 hover:border-white/20'
           }`}
         >
           {isSidebarOpen && currentView !== 'home' ? (
@@ -167,7 +167,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           className={`header-control header-icon-control-mobile flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl border tv-focus transition-all duration-200 ${
             currentView === 'home'
               ? 'bg-sky-500 text-white border-sky-300 font-bold shadow-md shadow-sky-500/30'
-              : 'bg-slate-900/70 backdrop-blur-md border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
+              : 'glass-control text-slate-300 hover:text-white hover:bg-slate-800/70 hover:border-white/20'
           }`}
         >
           <Home className="w-4 h-4 text-sky-400" />
@@ -209,7 +209,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
                 className={`header-control flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold tv-focus transition-all duration-200 ${
                   isActive
                     ? 'bg-sky-500 text-white border border-sky-300 font-bold shadow-md shadow-sky-500/30'
-                    : 'bg-slate-900/60 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
+                    : 'glass-control text-slate-300 hover:text-white hover:bg-slate-800/70 hover:border-white/20'
                 }`}
               >
                 <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-sky-400'}`} />
