@@ -1085,7 +1085,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <div className="relative h-11 flex items-center">
               <div className="relative h-3 w-full rounded-full bg-slate-800 overflow-hidden pointer-events-none">
                 <div className="absolute inset-y-0 left-0 bg-slate-600/60" style={{ width: `${bufferPercent}%` }} />
-                <div className="absolute inset-y-0 left-0 bg-sky-500" style={{ width: `${progressPercent}%` }} />
+                <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-sky-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.65)] transition-[width] duration-300" style={{ width: `${progressPercent}%` }} />
               </div>
               {scrubTime !== null && duration > 0 && (
                 <div
