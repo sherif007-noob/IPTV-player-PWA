@@ -40,13 +40,13 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
       overlayId="ios-pwa-install-modal"
       cardId="ios-pwa-install-card"
       ariaLabel="Install on iPhone or iPad"
-      overlayClassName="z-50 bg-black/80 backdrop-blur-md p-4"
-      cardClassName="w-full max-w-sm bg-slate-900 border border-slate-700/80 rounded-2xl p-6 shadow-2xl space-y-4 text-left relative overflow-y-auto"
+      overlayClassName="z-50 p-4"
+      cardClassName="pwa-install-card w-full max-w-sm rounded-2xl p-6 space-y-4 text-left relative overflow-y-auto"
     >
       <button
         onClick={() => setShowIOSGuide(false)}
         aria-label="Close install instructions"
-        className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
+        className="icon-control glass-control tv-focus absolute top-4 right-4 rounded-lg text-slate-400 hover:text-white"
       >
         <X className="w-4 h-4" />
       </button>
@@ -62,7 +62,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
       </div>
 
       <div className="space-y-3 text-xs text-slate-300">
-        <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+        <div className="glass-control flex items-start gap-3 p-2.5 rounded-xl">
           <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">1</div>
           <div>
             <p className="font-semibold text-white flex items-center gap-1.5">
@@ -74,7 +74,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
           </div>
         </div>
 
-        <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+        <div className="glass-control flex items-start gap-3 p-2.5 rounded-xl">
           <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">2</div>
           <div>
             <p className="font-semibold text-white flex items-center gap-1.5">
@@ -86,7 +86,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
           </div>
         </div>
 
-        <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+        <div className="glass-control flex items-start gap-3 p-2.5 rounded-xl">
           <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">3</div>
           <div>
             <p className="font-semibold text-white">Tap "Add" in the top right</p>
@@ -132,7 +132,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
 
   // Settings variant
   return (
-    <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+    <div className="glass-surface p-4 rounded-xl space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Download className="w-4 h-4 text-sky-400" />
