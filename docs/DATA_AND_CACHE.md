@@ -51,7 +51,7 @@ If a cached exact catalog exists:
 - if stale, invalidate the wrapped service RAM cache and start a background provider refresh
 - replace hot + persistent data after a successful refresh
 
-If a category-specific cache is missing but an `all` catalog exists, category data may be derived locally by filtering `category_id`.
+If a category-specific cache is missing, the app prefers the provider's category endpoint. It only filters an `all` catalog when that full catalog is already hot in memory; it does not deserialize a huge persistent `all` record merely to serve one category.
 
 If no cache can satisfy the request, the provider is queried.
 
@@ -122,3 +122,6 @@ The underlying Xtream service can return built-in demo arrays when a provider re
 ## Memory release
 
 IndexedDB is the durable catalog layer; full catalogs do not need to stay resident in JavaScript memory after navigation. When the app returns Home or abandons a full-library search, it releases wrapper hot caches and the underlying Xtream service catalog cache. This trades a future IndexedDB read for substantially lower iOS memory pressure.
+
+
+Home scroll position uses the same lightweight localStorage restoration path as library/category scroll positions.
