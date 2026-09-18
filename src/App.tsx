@@ -843,7 +843,12 @@ export default function App() {
       const grid = document.getElementById('main-scrollable-content-grid');
       if (!grid) return;
       const saved = Number(localStorage.getItem(key) || 0);
-      if (Number.isFinite(saved) && saved > 0) grid.scrollTop = saved;
+      if (Number.isFinite(saved) && saved > 0) {
+        headerScrollStateRef.current.lastTop = saved;
+        headerScrollStateRef.current.direction = 0;
+        headerScrollStateRef.current.accumulated = 0;
+        grid.scrollTop = saved;
+      }
     });
     return () => window.cancelAnimationFrame(restore);
   }, [currentView, selectedCategoryId, isLoadingContent, displayedGridItems.length]);
