@@ -41,7 +41,7 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
   userInfo,
   serverInfo,
   isDemo,
-  tvFontSize = 'xlarge',
+  tvFontSize = 'huge',
   onTvFontSizeChange,
 }) => {
   const dialogRef = useDialog(isOpen, onClose);
