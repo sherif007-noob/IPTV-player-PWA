@@ -13,7 +13,7 @@ const PROVIDER_ORIGIN = process.env.PROVIDER_ORIGIN || "";
 const ALLOWED_IPTV_HOSTS = process.env.ALLOWED_IPTV_HOSTS
   ? process.env.ALLOWED_IPTV_HOSTS.split(",").map((host) => host.trim().toLowerCase())
   : [];
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 8080);
 const HLS_ROOT = path.join(os.tmpdir(), `iptv-player-hls-${PORT}`);
 
 type StopFn = (reason: string) => void;
