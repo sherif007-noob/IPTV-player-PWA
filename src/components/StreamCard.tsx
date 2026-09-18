@@ -55,7 +55,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
             src={item.icon}
             alt={item.name}
             onError={() => setImageError(true)}
-            className="w-full h-full object-cover group-hover:scale-108 group-focus:scale-108 transition-transform duration-500"
+            className="w-full h-full object-cover transition-transform duration-500"
             referrerPolicy="no-referrer"
             loading="lazy"
             decoding="async"
