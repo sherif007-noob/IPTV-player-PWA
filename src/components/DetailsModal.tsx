@@ -199,8 +199,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
       overlayId="details-modal-overlay"
       cardId="details-card-container"
       ariaLabel="Title details"
-      overlayClassName="z-40 bg-black/80 backdrop-blur-2xl p-2 sm:p-4"
-      cardClassName={`details-modal-card relative w-full max-w-5xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 rounded-3xl overflow-hidden z-10 flex flex-col shadow-2xl shadow-black/80 ${
+      overlayClassName="z-40 p-2 sm:p-4"
+      cardClassName={`details-modal-card relative w-full max-w-5xl rounded-3xl overflow-hidden z-10 flex flex-col ${
         isSeries ? 'details-series h-[92dvh] max-h-full' : 'details-movie max-h-full overflow-y-auto my-auto'
       }`}
     >
@@ -209,7 +209,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
           <button
             id="btn-details-back"
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-950/80 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white hover:border-sky-400 tv-focus shadow-lg transition-all"
+            className="glass-control flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-slate-300 hover:text-white hover:border-sky-400 tv-focus transition-all"
           >
             <ArrowLeft className="w-4 h-4 text-sky-400" />
             <span className="text-xs font-medium">Back [ESC]</span>
@@ -219,7 +219,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
         {/* Hero Section with Backdrop & Cover Art */}
         {isSeries ? (
           /* ULTRA-COMPACT UPPER SECTION FOR TV SERIES (leaves full screen for episodes) */
-          <div className="details-series-hero relative shrink-0 p-3 sm:p-4 bg-slate-900 border-b border-slate-800 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+          <div className="details-series-hero details-glass-section relative shrink-0 p-3 sm:p-4 border-b border-white/10 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="details-series-summary flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
               {/* Compact Cover Art */}
               <div className="w-16 sm:w-20 aspect-[2/3] shrink-0 rounded-lg overflow-hidden border border-slate-700 bg-slate-950 relative shadow-md">
@@ -452,7 +452,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                         {castList.map((actor, idx) => (
                           <span
                             key={idx}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-100 border border-slate-700 text-xs font-medium"
+                            className="glass-control px-2.5 py-1 rounded-lg text-slate-100 text-xs font-medium"
                           >
                             {actor}
                           </span>
@@ -544,7 +544,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
         {/* Series Section: Season Tabs & Episode Progress Tracker (ONLY SCROLLABLE AREA) */}
         {isSeries && (
-          <div className="details-series-body p-3 sm:p-4 bg-slate-950 flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden">
+          <div className="details-series-body details-glass-body p-3 sm:p-4 flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden">
             <div className="details-season-toolbar flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-2 shrink-0">
               {/* Season Selection Tabs */}
               <div className="details-season-tabs flex items-center gap-2 overflow-x-auto" role="tablist" aria-label="Seasons">
@@ -577,7 +577,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
               {/* Season Watched Progress Bar */}
               {seasonProgress && (
-                <div className="details-season-progress flex items-center gap-2.5 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+                <div className="details-season-progress glass-control flex items-center gap-2.5 px-3 py-1.5 rounded-xl">
                   <span className="text-xs text-slate-300 font-medium">
                     Watched {seasonProgress.watchedCount} / {seasonProgress.total} episodes
                   </span>
@@ -692,7 +692,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                       <div className="details-episode-actions flex flex-col items-end justify-between gap-1.5 shrink-0 self-center">
                         <div
                           id={`btn-play-ep-${episode.id}`}
-                          className="p-1.5 rounded-lg bg-sky-500 text-white group-hover:bg-sky-400 shadow-md transition-colors"
+                          className="player-primary-control tv-focus p-1.5 rounded-lg bg-sky-500 text-white group-hover:bg-sky-400 shadow-md transition-all"
                           title="Play episode"
                         >
                           <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
