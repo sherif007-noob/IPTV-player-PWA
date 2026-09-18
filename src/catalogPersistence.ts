@@ -96,7 +96,7 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   );
 };
 
-export function invalidatePersistentCatalogs() {
+export async function invalidatePersistentCatalogs() {
   inFlight.clear();
-  void clearCatalogs();
+  await clearCatalogs();
 }
