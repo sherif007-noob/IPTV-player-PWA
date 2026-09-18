@@ -1530,6 +1530,9 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     padding-top: calc(var(--app-header-height, 96px) + 14px) !important;
   }
 
+}
+
+@media (max-width: 639px) {
   .header-icon-control-mobile {
     width: var(--ds-touch-target) !important;
     height: var(--ds-touch-target) !important;
