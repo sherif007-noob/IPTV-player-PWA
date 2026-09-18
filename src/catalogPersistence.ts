@@ -191,8 +191,13 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   return data;
 };
 
+export function releaseCatalogMemory() {
+  hotCatalogs.clear();
+  xtreamService.clearCache();
+}
+
 export async function invalidatePersistentCatalogs() {
   inFlight.clear();
-  hotCatalogs.clear();
+  releaseCatalogMemory();
   await clearCatalogs();
 }
