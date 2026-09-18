@@ -117,3 +117,8 @@ Playback progress mutations synchronously write the updated progress list to loc
 ## Provider failure / demo fallback safety
 
 The underlying Xtream service can return built-in demo arrays when a provider request fails. The persistent wrapper compares returned catalogs against the exported demo fixtures. For a real provider it rejects the fallback result, does **not** write it to hot cache or IndexedDB, and self-heals matching legacy persisted fallback entries before retrying the provider path. This prevents a transient network/provider failure from masquerading as real catalog data or poisoning the persistent cache for the normal TTL.
+
+
+## Memory release
+
+IndexedDB is the durable catalog layer; full catalogs do not need to stay resident in JavaScript memory after navigation. When the app returns Home or abandons a full-library search, it releases wrapper hot caches and the underlying Xtream service catalog cache. This trades a future IndexedDB read for substantially lower iOS memory pressure.
