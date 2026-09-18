@@ -169,3 +169,9 @@ The last Pass 6 review identified and fixed two additional stale-data hazards:
 
 - VOD/Series detail-request dedupe/cache keys are now provider-scoped (normalized server + username + content ID). Switching providers/accounts can no longer reuse a five-minute detail payload from another provider that happens to share the same numeric ID.
 - Persistent catalog invalidation now has a separate persistence generation. Requests that began before a manual persistent-cache invalidation may finish, but they are not allowed to write their old result back into IndexedDB after the invalidation completes. Ordinary navigation-only memory release still permits useful late results to persist for future rehydration.
+
+
+### Final async-dedupe and detail-cache bounds
+
+- In-flight catalog dedupe cleanup is identity-safe: an older Promise can no longer delete a newer Promise's map entry after invalidation/key reuse.
+- Provider-scoped VOD/Series detail caches are bounded and prune expired entries, preventing long-running sessions/provider switches from accumulating detail payloads indefinitely.
