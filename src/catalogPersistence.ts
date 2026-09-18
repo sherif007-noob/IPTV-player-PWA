@@ -74,12 +74,17 @@ async function deduped<T>(
   const existing = inFlight.get(key);
   if (existing) return existing as Promise<T[]>;
 
-  const pending = request()
+  let pending!: Promise<T[]>;
+  pending = request()
     .then(async (data) => {
       if (Array.isArray(data) && data.length) await persist(data);
       return data;
     })
-    .finally(() => inFlight.delete(key));
+    .finally(() => {
+      // An invalidation can clear the map and a newer request can reuse this key
+      // before the old Promise settles. Only remove the entry if it is still us.
+      if (inFlight.get(key) === pending) inFlight.delete(key);
+    });
 
   inFlight.set(key, pending);
   return pending;
