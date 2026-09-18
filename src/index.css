@@ -164,9 +164,22 @@ input, textarea { user-select: text; -webkit-user-select: text; }
 button, [role=button], a { touch-action: manipulation; }
 button:focus-visible, [role=button]:focus-visible, select:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
 @media (any-pointer: coarse) {
-  button, select, [role=button] { min-height: 44px; min-width: 44px; }
+  button, select, [role=button] { min-height: 44px; }
   input:not([type=checkbox]):not([type=range]), textarea, select { font-size: max(16px, 1em); }
   label:has(input[type=checkbox]) { min-height: 44px; }
+  .touch-square,
+  .stream-card-action,
+  .details-watched-toggle,
+  #btn-header-hamburger,
+  #btn-header-home,
+  #btn-header-settings,
+  #btn-pwa-install-header,
+  #btn-close-category-sidebar,
+  #btn-clear-header-search {
+    min-width: 44px;
+    width: 44px;
+    min-height: 44px;
+  }
   .tv-focus:focus:not(:focus-visible) { outline: none !important; box-shadow: none !important; transform: none; }
 }
 @media (max-width: 1100px) {
