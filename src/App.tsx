@@ -1574,18 +1574,30 @@ export default function App() {
             const nextProvider = currentCatalogProviderKey();
             fullCatalogLoadedRef.current = { vod: false, series: false };
             homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
+            setLiveChannels([]);
             setMovies([]);
             setSeries([]);
+            setCategories([]);
             setCredentials(nextCredentials);
             setCatalogCounts({ provider: nextProvider, vod: 0, series: 0 });
             setUserInfo(xtreamService.getUserInfo());
             setServerInfo(xtreamService.getServerInfo());
             setIsDemo(xtreamService.getIsDemo());
 
-            if (
-              currentView !== 'home' &&
-              !selectedCategoryId.startsWith('special_')
+            if (currentView === 'home') {
+              const [nextLiveCategories, nextLiveStreams] = await Promise.allSettled([
+                xtreamService.getCategories('live'),
+                xtreamService.getLiveStreams('all'),
+              ]);
+              if (nextLiveCategories.status === 'fulfilled') setCategories(nextLiveCategories.value);
+              if (nextLiveStreams.status === 'fulfilled') setLiveChannels(nextLiveStreams.value);
+            } else if (
+              (currentView === 'live' || currentView === 'vod' || currentView === 'series') &&
+              selectedCategoryId.startsWith('special_')
             ) {
+              const nextCategories = await xtreamService.getCategories(currentView);
+              setCategories(nextCategories);
+            } else if (currentView !== 'home') {
               await loadViewData(currentView as MainNavView, selectedCategoryId);
             }
           })();
