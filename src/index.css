@@ -1849,3 +1849,13 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
  * one-off cyan glows. Strong sky/cyan is reserved for focus, active state,
  * primary actions, and playback progress.
  */
+
+
+.offline-indicator {
+  background: rgba(146, 64, 14, 0.58) !important;
+  -webkit-backdrop-filter: blur(var(--ds-blur-control)) saturate(135%);
+  backdrop-filter: blur(var(--ds-blur-control)) saturate(135%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 10px 28px rgba(0,0,0,.30);
+}
