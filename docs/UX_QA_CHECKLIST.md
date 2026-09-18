@@ -248,3 +248,10 @@ The controls timer must retain one generation/deadline owner. Do not add a secon
 
 - Start catalog request A, invalidate/refresh, then immediately start request B for the same provider/category key before A settles. When A finishes, B must remain registered as the active dedupe Promise; a third caller must join B rather than starting request C.
 - Open many different title details across a long session and provider switches; expired detail entries should be pruned rather than growing the detail cache without bound.
+
+
+## Provider-switch in-flight regression
+
+- Begin loading Live/categories/VOD/Series on provider A, then connect provider B before A finishes. No late A response may become visible or remain in the underlying service cache for B.
+- After a successful provider switch, Movies/Series React arrays and last-provider catalog counts must reset before B is reloaded.
+- Switching provider while Favorites/Continue/Watchlist is open must not force a full B catalog fetch merely to render that special list.
