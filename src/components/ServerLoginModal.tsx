@@ -1,3 +1,4 @@
+import { useDialog } from '../hooks/useDialog';
 import React, { useState } from 'react';
 import {
   Server,
@@ -43,6 +44,8 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
   tvFontSize = 'xlarge',
   onTvFontSizeChange,
 }) => {
+  const dialogRef = useDialog(isOpen, onClose);
+  const backdropStart = React.useRef(false);
   const [server, setServer] = useState(
     currentCredentials?.server && !currentCredentials.server.includes('your-provider.com')
       ? currentCredentials.server
@@ -137,10 +140,20 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
   return (
     <div
       id="server-login-modal-overlay"
+      onPointerDown={(event) => { backdropStart.current = event.target === event.currentTarget; }}
+      onClick={(event) => {
+        if (backdropStart.current && event.target === event.currentTarget) onClose();
+        backdropStart.current = false;
+      }}
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-4"
     >
       <div
         id="server-login-card"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Server settings"
+        tabIndex={-1}
         className="w-full max-w-xl bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col shadow-2xl shadow-black/80"
       >
         {/* Header */}

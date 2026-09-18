@@ -45,7 +45,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
           <button
             id="card-portal-live"
             onClick={() => onSelectSection('live')}
-            onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+            onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
             className="group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-white/10 p-8 cursor-pointer tv-focus hover:border-sky-400 focus:border-sky-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-sky-500/20 hover:-translate-y-1 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
@@ -69,7 +69,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
           <button
             id="card-portal-vod"
             onClick={() => onSelectSection('vod')}
-            onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+            onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
             className="group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-white/10 p-8 cursor-pointer tv-focus hover:border-indigo-400 focus:border-indigo-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-indigo-500/20 hover:-translate-y-1 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
@@ -95,7 +95,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
           <button
             id="card-portal-series"
             onClick={() => onSelectSection('series')}
-            onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+            onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
             className="group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-white/10 p-8 cursor-pointer tv-focus hover:border-violet-400 focus:border-violet-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-violet-500/20 hover:-translate-y-1 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
@@ -170,7 +170,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
                   key={`${item.id}-${idx}`}
                   id={`card-jump-back-${idx}`}
                   onClick={() => onResumeRecent && onResumeRecent(item)}
-                  onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                  onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                   className="group relative rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-white/10 p-4.5 cursor-pointer tv-focus hover:border-sky-400 focus:border-sky-400 hover:bg-slate-800/80 flex flex-col justify-between overflow-hidden transition-all duration-300 shadow-lg hover:shadow-sky-500/15 hover:-translate-y-0.5"
                 >
                   <div className="flex items-start gap-3.5">

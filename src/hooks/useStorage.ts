@@ -29,7 +29,7 @@ export function isMobileDevice(): boolean {
   const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(
     navigator.userAgent
   );
-  return isSmallScreen || isMobileUA;
+  return isSmallScreen || window.matchMedia('(pointer: coarse)').matches || isMobileUA;
 }
 
 function getInitialTvFontSize(): TvFontSize {

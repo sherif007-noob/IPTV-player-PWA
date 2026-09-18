@@ -21,9 +21,11 @@ interface RemoteHandlers {
 export function useWebOSRemote(handlers: RemoteHandlers, isPlayerActive: boolean = false) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
+      // Player and dialogs own their keys; never run two handlers for one action.
+      if (isPlayerActive || e.defaultPrevented || document.querySelector('[aria-modal="true"]')) return;
       // Don't intercept if typing in an input field (e.g. search or login)
       const target = e.target as HTMLElement | null;
-      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable);
 
       const keyCode = e.keyCode || e.which;
 

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>WebOS Xtream IPTV Player</title>
     <meta name="description" content="High-performance cross-platform IPTV PWA and LG webOS player supporting Xtream Code playlists, Live TV, 4K VOD, Series with episode tracking, offline PWA installability, and adaptive streaming." />
     <meta property="og:title" content="WebOS Xtream IPTV Player" />
@@ -20,7 +20,7 @@
     <script>
       (function() {
         try {
-          var isMobile = (window.innerWidth <= 768) || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
+          var isMobile = (window.matchMedia('(pointer: coarse)').matches) || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
           var userSelected = localStorage.getItem('tv_font_user_selected');
           var saved = localStorage.getItem('webos_tv_font_size');
           var font = (userSelected && saved) ? saved : (isMobile ? 'small' : (saved || 'huge'));

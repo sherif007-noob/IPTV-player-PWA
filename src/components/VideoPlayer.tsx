@@ -292,6 +292,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const pendingSeekRef = useRef<{ target: number; resume: boolean } | null>(null);
   const seekRestartTimerRef = useRef<number | null>(null);
 
+  const feedbackTimerRef = useRef<number | null>(null);
+  const controlsTimerRef = useRef<number | null>(null);
+  const playerRef = useRef<HTMLDivElement>(null);
+  const tapRef = useRef<{ time: number; side: number } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const scrubRef = useRef<number | null>(null);
+  const [scrubTime, setScrubTime] = useState<number | null>(null);
+  const [keyboardFocus, setKeyboardFocus] = useState(false);
+
   const [activeUrl, setActiveUrl] = useState('');
   const [isPlaying, setIsPlaying] = useState(true);
   const [isBuffering, setIsBuffering] = useState(true);
@@ -310,6 +319,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const isSeries = item.type === 'series' || !!seriesContext;
   const metadataDuration = getKnownDuration(item, seriesContext);
 
+  const revealControls = useCallback(() => {
+    setShowControls(true);
+    if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
+    if (isPlaying && !isBuffering && !playbackError && !showEpisodes && scrubRef.current === null && !keyboardFocus) {
+      controlsTimerRef.current = window.setTimeout(() => setShowControls(false), 3000);
+    }
+  }, [isPlaying, isBuffering, playbackError, showEpisodes, keyboardFocus]);
+
+  useEffect(() => {
+    revealControls();
+    return () => {
+      if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
+    };
+  }, [revealControls, scrubTime === null]);
+
+  useEffect(() => () => {
+    if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
+    if (seekRestartTimerRef.current !== null) window.clearTimeout(seekRestartTimerRef.current);
+  }, []);
+
   const buildPlaybackUrl = useCallback((baseUrl: string, startSeconds?: number) => {
     let next = withPlaybackIdentity(baseUrl, sessionRef.current, String(++playbackCounterRef.current));
     if (typeof startSeconds === 'number' && startSeconds > 0) next = withStart(next, startSeconds);
@@ -318,6 +347,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, []);
 
   const safePlay = useCallback(() => {
+    resumeAfterSourceChangeRef.current = true;
     const video = videoRef.current;
     if (!video) return;
     try {
@@ -343,6 +373,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, []);
 
   const safePause = useCallback(() => {
+    resumeAfterSourceChangeRef.current = false;
     const video = videoRef.current;
     if (!video) return;
     try { video.pause(); } catch {}
@@ -544,7 +575,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const upper = duration > 0 ? duration : Number.MAX_SAFE_INTEGER;
     const target = Math.max(0, Math.min(upper, requestedSeconds));
-    const wasPlaying = !video.paused;
+    const wasPlaying = pendingSeekRef.current?.resume ?? (isBuffering ? resumeAfterSourceChangeRef.current : !video.paused);
     const generated = usesGeneratedHls(activeUrl);
     const sourceStart = generated ? getSourceStart(activeUrl) : 0;
 
@@ -598,7 +629,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     } catch {
       return false;
     }
-  }, [activeUrl, buildPlaybackUrl, duration, isLive, safePlay]);
+  }, [activeUrl, buildPlaybackUrl, duration, isLive, isBuffering, safePlay]);
 
   const handleSeek = useCallback((delta: number) => {
     const video = videoRef.current;
@@ -618,7 +649,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const applied = seekToPosition(target);
     if (applied) {
       setSeekFeedback(`${delta >= 0 ? '+' : ''}${delta}s`);
-      window.setTimeout(() => setSeekFeedback(null), 700);
+      if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
+      feedbackTimerRef.current = window.setTimeout(() => setSeekFeedback(null), 700);
     }
   }, [currentTime, seekToPosition]);
 
@@ -647,6 +679,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     hardStopVideo(videoRef.current);
     onClose();
   }, [activeUrl, onClose]);
+
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    playerRef.current?.focus({ preventScroll: true });
+    return () => { if (previous?.isConnected) previous.focus({ preventScroll: true }); };
+  }, []);
 
   const handleTimeUpdate = useCallback(() => {
     const video = videoRef.current;
@@ -687,7 +725,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      revealControls();
+      const target = event.target as HTMLElement;
+      if (event.key === 'Tab') {
+        const buttons = Array.from(playerRef.current?.querySelectorAll<HTMLElement>('button, select, [role="slider"]') || []).filter((element: HTMLElement) => element.getClientRects().length);
+        const first = buttons[0] as HTMLElement | undefined;
+        const last = buttons[buttons.length - 1] as HTMLElement | undefined;
+        if (!showControls) {
+          event.preventDefault();
+          requestAnimationFrame(() => (event.shiftKey ? last : first)?.focus());
+        } else if (event.shiftKey && (target === first || target === playerRef.current)) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && target === last) { event.preventDefault(); first?.focus(); }
+      }
       const code = event.keyCode || event.which;
+      if (event.key === 'Escape' && showEpisodes) {
+        event.preventDefault(); setShowEpisodes(false); return;
+      }
+      if (target.closest('input, select, textarea, [role="slider"], [contenteditable="true"]') && event.key !== 'Escape') return;
+      if (target.closest('button') && code === 32) return;
       if (code === 27 || code === 461 || code === 10009 || event.key === 'Escape' || event.key === 'BrowserBack') {
         event.preventDefault(); closePlayer(); return;
       }
@@ -703,20 +759,31 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [closePlayer, handleSeek, isLive, togglePlay]);
+  }, [closePlayer, handleSeek, isLive, togglePlay, revealControls, showEpisodes, showControls]);
 
   const nextEpisode = isSeries && seriesContext?.allEpisodes
     ? seriesContext.allEpisodes.find((episode) => episode.episode_num === seriesContext.episode.episode_num + 1)
     : null;
 
-  const progressPercent = duration > 0 ? Math.max(0, Math.min(100, (currentTime / duration) * 100)) : 0;
+  const progressPercent = duration > 0 ? Math.max(0, Math.min(100, ((scrubTime ?? currentTime) / duration) * 100)) : 0;
   const bufferPercent = duration > 0 ? Math.max(0, Math.min(100, (buffered / duration) * 100)) : 0;
 
   return (
     <div
+      ref={playerRef}
+      id="video-player"
+      tabIndex={-1}
+      style={{ cursor: showControls ? undefined : 'none' }}
       className="fixed inset-0 z-50 bg-black flex items-center justify-center select-none overflow-hidden"
-      onMouseMove={() => setShowControls(true)}
-      onClick={() => setShowControls(true)}
+      onPointerMove={(event) => { if (event.pointerType === 'mouse') revealControls(); }}
+      onPointerDown={() => { setKeyboardFocus(false); revealControls(); }}
+      onFocusCapture={(event) => {
+        if (event.target !== event.currentTarget && event.target.matches(':focus-visible')) setKeyboardFocus(true);
+        revealControls();
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocus(false);
+      }}
     >
       {activeUrl && (
         <video
@@ -733,6 +800,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             setIsBuffering(false);
             setIsPlaying(true);
             setPlaybackError(null);
+            setSeekFeedback(null);
           }}
           onPause={() => setIsPlaying(false)}
           onError={(event) => {
@@ -759,6 +827,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         />
       )}
 
+      <div
+        className="absolute inset-0 z-10"
+        style={{ touchAction: 'manipulation' }}
+        aria-label="Playback gesture area"
+        onClick={() => { setShowEpisodes(false); revealControls(); }}
+        onPointerDown={(event) => {
+          if (!event.isPrimary || event.pointerType === 'mouse') return;
+          touchStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now() };
+        }}
+        onPointerCancel={() => { touchStartRef.current = null; tapRef.current = null; }}
+        onPointerUp={(event) => {
+          const start = touchStartRef.current;
+          touchStartRef.current = null;
+          if (!start || !event.isPrimary || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 20 || Date.now() - start.time > 350) {
+            tapRef.current = null; return;
+          }
+          revealControls();
+          const rect = event.currentTarget.getBoundingClientRect();
+          const ratio = (event.clientX - rect.left) / rect.width;
+          const side = ratio < 0.4 ? -1 : ratio > 0.6 ? 1 : 0;
+          const previous = tapRef.current;
+          if (!isLive && side && previous?.side === side && Date.now() - previous.time < 320) {
+            handleSeek(side * 10);
+            tapRef.current = null;
+          } else tapRef.current = { time: Date.now(), side };
+        }}
+      />
+
       {isBuffering && !playbackError && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
           <div className="rounded-xl border border-slate-700 bg-black/90 px-5 py-3 text-sm font-semibold text-slate-200">
@@ -783,7 +879,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 }}
                 className="px-4 py-2 rounded-lg bg-sky-500 text-white font-semibold"
               >Retry</button>
-              <button onClick={closePlayer} className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold">Close</button>
+              <button aria-label="Close player" onClick={closePlayer} className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold">Close</button>
             </div>
           </div>
         </div>
@@ -797,10 +893,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      <div className={`absolute top-0 inset-x-0 z-30 p-5 bg-gradient-to-b from-black/95 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div inert={!showControls} className={`player-top absolute top-0 inset-x-0 z-30 p-5 bg-gradient-to-b from-black/95 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <button onClick={closePlayer} className="p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white">
+            <button aria-label="Close player" onClick={closePlayer} className="p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="min-w-0">
@@ -825,7 +921,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </div>
 
       {showEpisodes && isSeries && seriesContext?.allEpisodes && (
-        <div className="absolute top-20 right-5 z-40 w-80 max-h-[60vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/95 p-3 space-y-2">
+        <div className="player-episodes absolute top-20 right-5 z-40 w-80 max-w-[calc(100%-2.5rem)] max-h-[60dvh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/95 p-3 space-y-2">
           {seriesContext.allEpisodes.map((episode) => {
             const watched = isEpisodeWatched
               ? isEpisodeWatched(seriesContext.seriesId, seriesContext.seasonNum, episode.episode_num)
@@ -852,31 +948,67 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      <div className={`absolute bottom-0 inset-x-0 z-30 p-5 bg-gradient-to-t from-black/95 via-black/75 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div inert={!showControls} className={`player-bottom absolute bottom-0 inset-x-0 z-30 p-5 bg-gradient-to-t from-black/95 via-black/75 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
         {!isLive && (
           <div className="mb-4">
-            <div
-              className={`relative h-3 rounded-full bg-slate-800 overflow-hidden ${duration > 0 ? 'cursor-pointer' : 'cursor-wait opacity-70'}`}
-              onClick={(event) => {
-                if (!(duration > 0)) return;
-                const rect = event.currentTarget.getBoundingClientRect();
-                const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-                seekToPosition(ratio * duration);
-              }}
-            >
-              <div className="absolute inset-y-0 left-0 bg-slate-600/60" style={{ width: `${bufferPercent}%` }} />
-              <div className="absolute inset-y-0 left-0 bg-sky-500" style={{ width: `${progressPercent}%` }} />
+            <div className="relative h-11 flex items-center">
+              <div className="relative h-3 w-full rounded-full bg-slate-800 overflow-hidden pointer-events-none">
+                <div className="absolute inset-y-0 left-0 bg-slate-600/60" style={{ width: `${bufferPercent}%` }} />
+                <div className="absolute inset-y-0 left-0 bg-sky-500" style={{ width: `${progressPercent}%` }} />
+              </div>
+              <div
+                role="slider"
+                tabIndex={duration > 0 ? 0 : -1}
+                aria-label="Seek playback"
+                aria-valuetext={formatTime(scrubTime ?? currentTime)}
+                aria-valuemin={0} aria-valuemax={duration || 1}
+                aria-valuenow={scrubTime ?? Math.min(currentTime, duration || 1)}
+                aria-disabled={!(duration > 0)}
+                className="seek-slider absolute inset-0 w-full h-full cursor-pointer touch-none rounded-full"
+                onPointerDown={(event) => {
+                  if (!event.isPrimary || event.button !== 0 || !(duration > 0)) return;
+                  event.preventDefault();
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const target = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * duration;
+                  scrubRef.current = target; setScrubTime(target); revealControls();
+                }}
+                onPointerMove={(event) => {
+                  if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const target = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * duration;
+                  scrubRef.current = target; setScrubTime(target);
+                }}
+                onPointerUp={(event) => {
+                  if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const target = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * duration;
+                  scrubRef.current = null; setScrubTime(null);
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                  seekToPosition(target); revealControls();
+                }}
+                onPointerCancel={() => { scrubRef.current = null; setScrubTime(null); }}
+                onLostPointerCapture={() => { scrubRef.current = null; setScrubTime(null); }}
+                onKeyDown={(event) => {
+                  if (!(duration > 0)) return;
+                  const steps: Record<string, number> = { ArrowLeft: -10, ArrowDown: -10, ArrowRight: 10, ArrowUp: 10, PageDown: -60, PageUp: 60 };
+                  if (event.key in steps || event.key === 'Home' || event.key === 'End') {
+                    event.preventDefault();
+                    seekToPosition(event.key === 'Home' ? 0 : event.key === 'End' ? duration : seekCursorRef.current + steps[event.key]);
+                  }
+                }}
+              />
             </div>
             <div className="mt-2 flex justify-between text-xs font-mono text-slate-300">
-              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(scrubTime ?? currentTime)}</span>
               <span>{duration > 0 ? formatTime(duration) : '--:--'}</span>
             </div>
           </div>
         )}
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <button onClick={togglePlay} className="w-11 h-11 rounded-xl bg-sky-500 text-white flex items-center justify-center">
+            <button aria-label={isPlaying ? "Pause" : "Play"} onClick={togglePlay} className="w-11 h-11 rounded-xl bg-sky-500 text-white flex items-center justify-center">
               {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
             </button>
 
@@ -892,6 +1024,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             )}
 
             <button
+              aria-label={isMuted ? "Unmute" : "Mute"}
               onClick={() => {
                 const video = videoRef.current;
                 if (!video) return;
@@ -908,6 +1041,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             <div className="flex items-center gap-2">
               <Subtitles className="w-4 h-4 text-slate-300" />
               <select
+                aria-label="Subtitles"
                 value={selectedSubtitleTrack}
                 onChange={(event) => {
                   const selected = Number(event.target.value);

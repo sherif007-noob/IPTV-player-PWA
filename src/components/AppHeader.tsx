@@ -72,8 +72,8 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
         setIsFontMenuOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
   }, []);
 
   const sections: { id: MainNavView; label: string; icon: any }[] = [
@@ -105,7 +105,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           id="btn-header-hamburger"
           data-skip-spatial="false"
           onClick={onToggleSidebar}
-          onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+          onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
           title={isSidebarOpen && currentView !== 'home' ? 'Hide sidebar' : 'Show categories sidebar'}
           aria-label="Toggle categories sidebar"
           className={`flex items-center justify-center p-2 rounded-xl border tv-focus transition-all duration-200 ${
@@ -124,7 +124,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
         <button
           id="btn-header-home"
           onClick={onNavigateHome}
-          onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+          onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
           title="Return to Home Dashboard"
           className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl border tv-focus transition-all duration-200 ${
             currentView === 'home'
@@ -145,8 +145,9 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
               <button
                 key={sec.id}
                 id={`header-tab-${sec.id}`}
+                aria-label={sec.label}
                 onClick={() => onSelectView(sec.id)}
-                onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold tv-focus transition-all duration-200 ${
                   isActive
                     ? 'bg-sky-500 text-white border border-sky-300 font-bold shadow-md shadow-sky-500/30'
@@ -168,6 +169,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           <input
             ref={inputRef}
             id="header-search-input"
+            aria-label="Search library"
             data-skip-spatial="true"
             type="text"
             value={searchQuery}

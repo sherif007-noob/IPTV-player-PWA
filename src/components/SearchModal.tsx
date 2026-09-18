@@ -1,3 +1,4 @@
+import { useDialog } from '../hooks/useDialog';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, X, Tv, Film, Clapperboard, Star, Clock } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
@@ -17,6 +18,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   onSelectItem,
   activeContentType = 'all',
 }) => {
+  const dialogRef = useDialog(isOpen, onClose);
+  const backdropStart = React.useRef(false);
   const [query, setQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | ContentType>(activeContentType);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -47,10 +50,20 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   return (
     <div
       id="search-modal-backdrop"
+      onPointerDown={(event) => { backdropStart.current = event.target === event.currentTarget; }}
+      onClick={(event) => {
+        if (backdropStart.current && event.target === event.currentTarget) onClose();
+        backdropStart.current = false;
+      }}
       className="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex flex-col items-center p-4 sm:p-8"
     >
       <div
         id="search-container-box"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search library"
+        tabIndex={-1}
         className="w-full max-w-4xl bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl shadow-black/80"
       >
         {/* Search Input Bar */}
@@ -63,7 +76,8 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search channels, movies, series, or genres in real-time..."
-            className="flex-1 bg-transparent text-slate-100 placeholder-slate-400 text-base sm:text-lg focus:outline-none font-medium"
+            aria-label="Search library"
+            className="min-w-0 flex-1 bg-transparent text-slate-100 placeholder-slate-400 text-base sm:text-lg focus:outline-none font-medium"
           />
           {query && (
             <button
@@ -122,6 +136,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             return (
               <div
                 key={`${item.type}-${item.id}`}
+                role="button" tabIndex={0}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault(); onSelectItem(item); onClose();
+                  }
+                }}
                 id={`search-result-item-${item.id}`}
                 onClick={() => {
                   onSelectItem(item);

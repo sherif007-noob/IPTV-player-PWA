@@ -1,3 +1,4 @@
+import { useDialog } from '../hooks/useDialog';
 import React, { useState, useEffect } from 'react';
 import {
   Play,
@@ -34,7 +35,7 @@ interface DetailsModalProps {
   onPlay: (
     item: ContentItem,
     startSeconds: number,
-    seriesMeta?: { seriesId: number; seasonNum: number; episode: Episode }
+    seriesMeta?: { seriesId: number; seasonNum: number; episode: Episode; allEpisodes?: Episode[] }
   ) => void;
   onToggleFavorite: (item: ContentItem) => void;
   onToggleWatchlist: (item: ContentItem) => void;
@@ -68,6 +69,8 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   getSeasonProgress,
   getEpisodeProgress,
 }) => {
+  const dialogRef = useDialog(true, onClose);
+  const backdropStart = React.useRef(false);
   const [vodDetails, setVodDetails] = useState<VodDetails | null>(null);
   const [seriesDetails, setSeriesDetails] = useState<SeriesDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,12 +186,22 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   return (
     <div
       id="details-modal-overlay"
+      onPointerDown={(event) => { backdropStart.current = event.target === event.currentTarget; }}
+      onClick={(event) => {
+        if (backdropStart.current && event.target === event.currentTarget) onClose();
+        backdropStart.current = false;
+      }}
       className="fixed inset-0 z-40 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 overflow-hidden"
     >
       <div
         id="details-card-container"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Title details"
+        tabIndex={-1}
         className={`relative w-full max-w-5xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 rounded-3xl overflow-hidden z-10 flex flex-col shadow-2xl shadow-black/80 ${
-          isSeries ? 'h-[92vh] max-h-[92vh]' : 'max-h-[90vh] overflow-y-auto my-auto'
+          isSeries ? 'details-series h-[92dvh] max-h-full' : 'max-h-full overflow-y-auto my-auto'
         }`}
       >
         {/* Top Action Bar (Back Button) */}
@@ -282,7 +295,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
               {lastSeriesProgress && lastSeriesProgress.timestamp > 5 ? (
                 <button
                   id="btn-resume-series-progress"
-                  onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                  onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                   onClick={() => {
                     const targetSeason = lastSeriesProgress.seasonNum || selectedSeason || 1;
                     const targetEpNum = lastSeriesProgress.episodeNum || 1;
@@ -315,7 +328,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                 currentEpisodes.length > 0 && (
                   <button
                     id="btn-play-series-next"
-                    onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                     onClick={() => {
                       const firstEp = currentEpisodes[0];
                       onPlay(item, 0, {
@@ -336,7 +349,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
               {/* Add to Favorites */}
               <button
                 id="btn-details-fav"
-                onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                 onClick={() => onToggleFavorite(item)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold tv-focus transition-all ${
                   isFavorite
@@ -351,7 +364,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
               {/* Add to Watchlist */}
               <button
                 id="btn-details-watchlist"
-                onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                 onClick={() => onToggleWatchlist(item)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold tv-focus transition-all ${
                   isInWatchlist
@@ -456,7 +469,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                 {progress && progress.timestamp > 5 && (
                   <button
                     id="btn-resume-playback"
-                    onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                     onClick={() => {
                       const resolvedExt =
                         vodDetails?.movie_data?.container_extension ||
@@ -479,7 +492,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
                 <button
                   id="btn-play-beginning"
-                  onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                  onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                   onClick={() => {
                     const resolvedExt =
                       vodDetails?.movie_data?.container_extension ||
@@ -499,7 +512,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
                 <button
                   id="btn-details-fav"
-                  onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                  onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                   onClick={() => onToggleFavorite(item)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold tv-focus transition-all ${
                     isFavorite
@@ -513,7 +526,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
 
                 <button
                   id="btn-details-watchlist"
-                  onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                  onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                   onClick={() => onToggleWatchlist(item)}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold tv-focus transition-all ${
                     isInWatchlist
@@ -546,7 +559,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                     <button
                       key={sNum}
                       id={`tab-season-${sNum}`}
-                      onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                      onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                       onClick={() => setSelectedSeason(sNum)}
                       className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold tv-focus transition-all ${
                         isActive
@@ -617,9 +630,9 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                     tabIndex={0}
                     role="button"
                     onClick={playThisEpisode}
-                    onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                         e.preventDefault();
                         playThisEpisode();
                       }

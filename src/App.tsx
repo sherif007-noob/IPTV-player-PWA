@@ -515,7 +515,7 @@ export default function App() {
       const input = document.getElementById('header-search-input');
       input?.focus();
     },
-  });
+  }, !!activePlayer);
 
   // Memoize converted items per content type to prevent unnecessary re-allocations
   const liveContentItems = useMemo<ContentItem[]>(() => {
@@ -822,9 +822,9 @@ export default function App() {
             )}
 
             {/* Content Stage Grid */}
-            <main className="flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-[#0b0e14] to-slate-950">
+            <main className="min-w-0 min-h-0 flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-[#0b0e14] to-slate-950">
               {/* Section Subheader / Breadcrumb */}
-              <div className="h-12 px-6 border-b border-slate-850 flex items-center justify-between shrink-0 bg-slate-950/40">
+              <div className="min-h-12 flex-wrap gap-2 py-2 px-3 sm:px-6 border-b border-slate-850 flex items-center justify-between shrink-0 bg-slate-950/40">
                 <div className="flex items-center gap-2 text-xs">
                   <button
                     onClick={handleNavigateHome}

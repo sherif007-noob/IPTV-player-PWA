@@ -37,9 +37,9 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
       tabIndex={0}
       role="button"
       onClick={() => onSelect(item)}
-      onPointerEnter={(e) => (e.currentTarget as HTMLElement).focus({ preventScroll: true })}
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault();
           onSelect(item);
         }
