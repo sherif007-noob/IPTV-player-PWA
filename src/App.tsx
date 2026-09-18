@@ -897,27 +897,27 @@ export default function App() {
             {/* The Category Sidebar for genres & categories from Xtream server */}
             {showCategorySidebar && !headerSearchQuery.trim() && (
               <>
-                {/* Mobile Backdrop */}
-                {isSidebarOpen && (
-                  <div
-                    id="sidebar-mobile-backdrop"
-                    className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 md:hidden"
-                    aria-hidden="true"
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onPointerUp={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      setIsSidebarOpen(false);
-                    }}
-                  />
-                )}
+                {/* Mobile Backdrop: remains mounted so opacity can animate cleanly. */}
+                <div
+                  id="sidebar-mobile-backdrop"
+                  className={`fixed inset-0 z-30 md:hidden transition-opacity duration-300 ease-in-out ${
+                    isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+                  }`}
+                  aria-hidden="true"
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onPointerUp={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setIsSidebarOpen(false);
+                  }}
+                />
 
                 {/* Sidebar Drawer Container */}
                 <div
