@@ -389,20 +389,22 @@ export const ServerLoginModal: React.FC<ServerLoginModalProps> = ({
                 <span>Screen Font Size & Scaling (70" TV Mode)</span>
               </label>
               <span className="text-[11px] font-mono text-sky-300 font-bold bg-sky-950 px-2 py-0.5 rounded border border-sky-800">
-                {tvFontSize === 'normal' && '100% - Standard'}
-                {tvFontSize === 'large' && '115% - Large'}
-                {tvFontSize === 'xlarge' && '130% - 70" TV (Recommended)'}
-                {tvFontSize === 'huge' && '150% - Cinema / Maximum'}
+                {tvFontSize === 'small' && '100% - Mobile / Standard'}
+                {tvFontSize === 'medium' && '125% - Medium'}
+                {tvFontSize === 'large' && '150% - Large'}
+                {tvFontSize === 'huge' && '180% - TV'}
+                {tvFontSize === 'maximum' && '210% - Maximum'}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {[
-                { id: 'normal' as const, label: '100%', title: 'Standard', desc: 'Default scale' },
-                { id: 'large' as const, label: '115%', title: 'Large', desc: '55" - 65" screens' },
-                { id: 'xlarge' as const, label: '130%', title: 'Extra Large', desc: '70"+ TV Best' },
-                { id: 'huge' as const, label: '150%', title: 'Cinema', desc: 'Max readability' },
-              ].map((opt) => {
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {([
+                { id: 'small', label: '100%', title: 'Small', desc: 'Mobile / standard' },
+                { id: 'medium', label: '125%', title: 'Medium', desc: 'Closer viewing' },
+                { id: 'large', label: '150%', title: 'Large', desc: 'Large screens' },
+                { id: 'huge', label: '180%', title: 'Huge', desc: 'TV viewing' },
+                { id: 'maximum', label: '210%', title: 'Maximum', desc: 'Maximum readability' },
+              ] as { id: TvFontSize; label: string; title: string; desc: string }[]).map((opt) => {
                 const isSelected = tvFontSize === opt.id;
                 return (
                   <button
