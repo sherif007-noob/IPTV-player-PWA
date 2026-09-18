@@ -1074,7 +1074,6 @@ export default function App() {
                           onSelect={handleSelectCard}
                           onToggleFavorite={storage.toggleFavorite}
                           onToggleWatchlist={storage.toggleWatchlist}
-                          onPlayDirect={(itm) => handleStartPlay(itm, 0)}
                         />
                       ))}
                     </div>
