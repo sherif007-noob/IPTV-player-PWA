@@ -1,4 +1,4 @@
-import { useDialog } from '../hooks/useDialog';
+import { ModalShell } from './ModalShell';
 import React, { useState, useEffect } from 'react';
 import {
   Play,
@@ -69,8 +69,6 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
   getSeasonProgress,
   getEpisodeProgress,
 }) => {
-  const dialogRef = useDialog(true, onClose);
-  const backdropStart = React.useRef(false);
   const [vodDetails, setVodDetails] = useState<VodDetails | null>(null);
   const [seriesDetails, setSeriesDetails] = useState<SeriesDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -184,26 +182,16 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
     : null;
 
   return (
-    <div
-      id="details-modal-overlay"
-      onPointerDown={(event) => { backdropStart.current = event.target === event.currentTarget; }}
-      onClick={(event) => {
-        if (backdropStart.current && event.target === event.currentTarget) onClose();
-        backdropStart.current = false;
-      }}
-      className="fixed inset-0 z-40 bg-black/80 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 overflow-hidden"
+    <ModalShell
+      onClose={onClose}
+      overlayId="details-modal-overlay"
+      cardId="details-card-container"
+      ariaLabel="Title details"
+      overlayClassName="z-40 bg-black/80 backdrop-blur-2xl p-2 sm:p-4"
+      cardClassName={`relative w-full max-w-5xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 rounded-3xl overflow-hidden z-10 flex flex-col shadow-2xl shadow-black/80 ${
+        isSeries ? 'details-series h-[92dvh] max-h-full' : 'max-h-full overflow-y-auto my-auto'
+      }`}
     >
-      <div
-        id="details-card-container"
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Title details"
-        tabIndex={-1}
-        className={`relative w-full max-w-5xl bg-slate-900/90 backdrop-blur-2xl border border-white/15 rounded-3xl overflow-hidden z-10 flex flex-col shadow-2xl shadow-black/80 ${
-          isSeries ? 'details-series h-[92dvh] max-h-full' : 'max-h-full overflow-y-auto my-auto'
-        }`}
-      >
         {/* Top Action Bar (Back Button) */}
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
           <button
@@ -748,7 +736,6 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </ModalShell>
   );
 };
