@@ -10,7 +10,6 @@ interface PWAInstallButtonProps {
 export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'header' }) => {
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
-  const [installSuccess, setInstallSuccess] = useState(false);
 
   // If already installed or running standalone, hide the button
   if (isInstalled) {
@@ -28,10 +27,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
   const handleInstall = async () => {
     if (isInstallable) {
       const success = await install();
-      if (success) {
-        setInstallSuccess(true);
-        setTimeout(() => setInstallSuccess(false), 4000);
-      }
+      if (!success) return;
     } else if (isIOS) {
       setShowIOSGuide(true);
     }
