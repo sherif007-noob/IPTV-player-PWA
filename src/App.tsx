@@ -1566,20 +1566,29 @@ export default function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onSuccess={() => {
-          const nextCredentials = xtreamService.getCredentials();
-          const nextProvider = currentCatalogProviderKey();
-          setCredentials(nextCredentials);
-          setCatalogCounts((previous) =>
-            previous.provider === nextProvider
-              ? previous
-              : { provider: nextProvider, vod: 0, series: 0 }
-          );
-          setUserInfo(xtreamService.getUserInfo());
-          setServerInfo(xtreamService.getServerInfo());
-          setIsDemo(xtreamService.getIsDemo());
-          if (currentView !== 'home') {
-            loadViewData(currentView as MainNavView, 'all');
-          }
+          void (async () => {
+            loadRequestIdRef.current += 1;
+            await invalidatePersistentCatalogs();
+
+            const nextCredentials = xtreamService.getCredentials();
+            const nextProvider = currentCatalogProviderKey();
+            fullCatalogLoadedRef.current = { vod: false, series: false };
+            homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
+            setMovies([]);
+            setSeries([]);
+            setCredentials(nextCredentials);
+            setCatalogCounts({ provider: nextProvider, vod: 0, series: 0 });
+            setUserInfo(xtreamService.getUserInfo());
+            setServerInfo(xtreamService.getServerInfo());
+            setIsDemo(xtreamService.getIsDemo());
+
+            if (
+              currentView !== 'home' &&
+              !selectedCategoryId.startsWith('special_')
+            ) {
+              await loadViewData(currentView as MainNavView, selectedCategoryId);
+            }
+          })();
         }}
         currentCredentials={credentials}
         userInfo={userInfo}
