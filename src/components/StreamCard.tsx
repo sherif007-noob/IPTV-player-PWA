@@ -148,7 +148,7 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
         {progress && progressPercent > 0 && (
           <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-800/80">
             <div
-              className="h-full bg-gradient-to-r from-sky-500 to-cyan-400 shadow-[0_0_8px_rgba(56,189,248,0.8)] transition-all duration-300"
+              className="h-full bg-gradient-to-r from-sky-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.8)] transition-all duration-300"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
