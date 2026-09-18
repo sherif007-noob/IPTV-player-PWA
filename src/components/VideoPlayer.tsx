@@ -360,11 +360,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   useEffect(() => {
     const generated = usesGeneratedHls(streamUrl);
-    const next = buildPlaybackUrl(streamUrl, generated && initialTime > 0 ? initialTime : undefined);
-    initialNativeSeekRef.current = generated ? 0 : Math.max(0, initialTime);
+    const next = buildPlaybackUrl(streamUrl);
+    initialNativeSeekRef.current = Math.max(0, initialTime);
     resumeAfterSourceChangeRef.current = true;
     setActiveUrl(next);
-    setCurrentTime(generated ? getSourceStart(next) : 0);
+    setCurrentTime(0);
     setBuffered(0);
     setDuration(getKnownDuration(item, seriesContext));
     setPlaybackError(null);
@@ -390,10 +390,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const onReady = () => {
       updateDurationFromMedia();
-      if (!usesGeneratedHls(activeUrl) && initialNativeSeekRef.current > 0) {
+      if (initialNativeSeekRef.current > 0) {
         const target = initialNativeSeekRef.current;
-        initialNativeSeekRef.current = 0;
-        try { video.currentTime = target; } catch {}
+        const seekableEnd = video.seekable.length
+          ? video.seekable.end(video.seekable.length - 1)
+          : 0;
+        if (target <= seekableEnd + 0.5) {
+          initialNativeSeekRef.current = 0;
+          try { video.currentTime = target; } catch {}
+        }
       }
 
       const tracks = Array.from(video.textTracks || []).map((track: TextTrack, id) => ({
@@ -408,14 +413,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     };
 
     const nativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
-    if (nativeHls) {
-      metadataHandler = onReady;
-      video.addEventListener('loadedmetadata', metadataHandler, { once: true });
-      video.preload = 'auto';
-      video.src = mediaUrl;
-      video.load();
-      console.log(`Universal HLS (native): ${mediaUrl}`);
-    } else if (Hls.isSupported()) {
+    if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -440,6 +438,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
       });
       console.log(`Universal HLS (hls.js): ${mediaUrl}`);
+    } else if (nativeHls) {
+      metadataHandler = onReady;
+      video.addEventListener('loadedmetadata', metadataHandler, { once: true });
+      video.preload = 'auto';
+      video.src = mediaUrl;
+      video.load();
+      console.log(`Universal HLS (native): ${mediaUrl}`);
     } else {
       setIsBuffering(false);
       setPlaybackError('This browser does not support HLS playback.');
@@ -470,7 +475,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!video) return currentTime;
     const raw = Number(video.currentTime);
     if (!Number.isFinite(raw)) return currentTime;
-    return usesGeneratedHls(activeUrl) ? getSourceStart(activeUrl) + raw : raw;
+    return raw;
   }, [activeUrl, currentTime]);
 
   const recordProgress = useCallback(() => {
@@ -532,27 +537,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const target = Math.max(0, Math.min(upper, requestedSeconds));
     const wasPlaying = !video.paused;
 
-    if (usesGeneratedHls(activeUrl)) {
-      const currentAbsolute = logicalCurrentTime();
-      if (Math.abs(currentAbsolute - target) < 0.75) return;
-      resumeAfterSourceChangeRef.current = wasPlaying;
-      const nextUrl = buildPlaybackUrl(activeUrl, target);
-      setCurrentTime(target);
-      setBuffered(target);
-      setIsBuffering(true);
-      setPlaybackError(null);
-      setActiveUrl(nextUrl);
-      setSeekFeedback(`${target >= currentAbsolute ? '+' : '-'}${Math.round(Math.abs(target - currentAbsolute))}s`);
-      window.setTimeout(() => setSeekFeedback(null), 1000);
-      console.log(`Universal HLS source switch: target=${Math.floor(target)}s url=${nextUrl}`);
+    const seekableEnd = video.seekable.length
+      ? video.seekable.end(video.seekable.length - 1)
+      : 0;
+
+    if (usesGeneratedHls(activeUrl) && target > seekableEnd + 0.5) {
+      setSeekFeedback(`Preparing ${formatTime(target)} · available to ${formatTime(seekableEnd)}`);
+      window.setTimeout(() => setSeekFeedback(null), 1800);
       return;
     }
 
     try {
       video.currentTime = target;
       setCurrentTime(target);
+      if (wasPlaying) safePlay();
     } catch {}
-  }, [activeUrl, buildPlaybackUrl, duration, isLive, logicalCurrentTime]);
+  }, [activeUrl, duration, isLive, safePlay]);
 
   const handleSeek = useCallback((delta: number) => {
     seekToPosition(currentTime + delta);
@@ -587,17 +587,26 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const raw = Number(video.currentTime);
     if (!Number.isFinite(raw)) return;
 
-    const start = usesGeneratedHls(activeUrl) ? getSourceStart(activeUrl) : 0;
-    const absolute = start + raw;
+    const absolute = raw;
     setCurrentTime(absolute);
 
-    if (video.buffered.length > 0) {
-      const rawEnd = video.buffered.end(video.buffered.length - 1);
-      setBuffered(start + rawEnd);
+    if (video.seekable.length > 0) {
+      setBuffered(video.seekable.end(video.seekable.length - 1));
+    } else if (video.buffered.length > 0) {
+      setBuffered(video.buffered.end(video.buffered.length - 1));
+    }
+
+    if (initialNativeSeekRef.current > 0 && video.seekable.length > 0) {
+      const target = initialNativeSeekRef.current;
+      const seekableEnd = video.seekable.end(video.seekable.length - 1);
+      if (target <= seekableEnd + 0.5) {
+        initialNativeSeekRef.current = 0;
+        try { video.currentTime = target; } catch {}
+      }
     }
 
     updateDurationFromMedia();
-    if (absolute > start + 0.05) setIsBuffering(false);
+    if (absolute > 0.05) setIsBuffering(false);
   }, [activeUrl, updateDurationFromMedia]);
 
   useEffect(() => {
