@@ -62,7 +62,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
       id="category-sidebar-panel"
       role="navigation"
       aria-label={`${title} categories`}
-      className="w-72 sm:w-80 md:w-64 max-w-[85vw] h-full bg-slate-950/60 md:bg-slate-950/66 backdrop-blur-2xl border-r border-white/10 flex flex-col shrink-0 select-none shadow-2xl md:shadow-xl"
+      className="glass-chrome w-72 sm:w-80 md:w-64 max-w-[85vw] h-full border-r flex flex-col shrink-0 select-none"
     >
       {/* Category Header */}
       <div className="p-3.5 border-b border-white/10 space-y-2">
@@ -83,7 +83,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
                 onClick={onClose}
                 title="Close Categories Sidebar"
                 aria-label="Close categories"
-                className="md:hidden p-1 rounded-lg text-slate-400 hover:text-white bg-slate-900/45 backdrop-blur-md border border-white/10 hover:bg-slate-800/70 tv-focus transition-all duration-200"
+                className="md:hidden icon-control glass-control rounded-lg text-slate-400 hover:text-white tv-focus transition-all duration-200"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -107,7 +107,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
                 else onClose?.();
               }
             }}
-            className="w-full bg-slate-900/70 backdrop-blur-md border border-white/10 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-sky-400 focus:shadow-[0_0_12px_rgba(56,189,248,0.25)] transition-all duration-200"
+            className="glass-control w-full rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-sky-400 focus:shadow-[0_0_12px_rgba(56,189,248,0.25)] transition-all duration-200"
           />
         </div>
       </div>
@@ -123,7 +123,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
             className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between tv-focus transition-all duration-200 ${
               selectedCategoryId === 'all'
                 ? 'bg-sky-500 text-white font-bold shadow-md shadow-sky-500/30'
-                : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                : 'text-slate-300 hover:text-white hover:bg-slate-800/55/60'
             }`}
           >
             <div className="flex items-center gap-2 truncate pr-1">
@@ -135,7 +135,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
                 className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
                   selectedCategoryId === 'all'
                     ? 'bg-sky-600 text-white'
-                    : 'bg-slate-800/80 text-slate-400 border border-white/5'
+                    : 'bg-slate-800/55 text-slate-400 border border-white/5'
                 }`}
               >
                 {allCount}
@@ -241,7 +241,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
               className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between tv-focus transition-all duration-200 ${
                 isSelected
                   ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/55'
               }`}
             >
               <div className="flex items-center gap-2 truncate pr-1">
