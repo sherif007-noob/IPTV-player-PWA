@@ -857,14 +857,25 @@ export default function App() {
   const currentGridItems = useMemo<ContentItem[]>(() => {
     let items: ContentItem[] = [];
 
-    const progressItems = storage.continueWatching.map((p) => ({
-      id: p.type === 'series' ? (p.seriesId || p.id) : p.id,
-      type: p.type,
-      name: p.title,
-      category_id: 'continue',
-      icon: p.poster,
-      seriesId: p.seriesId,
-    } as ContentItem));
+    const progressItems = Array.from(
+      storage.continueWatching.reduce((items, p) => {
+        const identity =
+          p.type === 'series'
+            ? `series:${p.seriesId || p.id}`
+            : `${p.type}:${p.id}`;
+        if (!items.has(identity)) {
+          items.set(identity, {
+            id: p.type === 'series' ? (p.seriesId || p.id) : p.id,
+            type: p.type,
+            name: p.title,
+            category_id: 'continue',
+            icon: p.poster,
+            seriesId: p.seriesId,
+          } as ContentItem);
+        }
+        return items;
+      }, new Map<string, ContentItem>()).values()
+    );
 
     if (selectedCategoryId === 'special_favorites') {
       items = storage.favorites.filter((item) =>
