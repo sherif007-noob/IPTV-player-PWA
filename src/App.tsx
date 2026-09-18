@@ -61,6 +61,23 @@ export default function App() {
     return isWebOSRuntime || new URLSearchParams(window.location.search).get('remoteHud') === '1';
   }, [isWebOSRuntime]);
 
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+
+    const syncVisualViewport = () => {
+      document.documentElement.style.setProperty('--app-visual-height', `${Math.round(viewport.height)}px`);
+    };
+    syncVisualViewport();
+    viewport.addEventListener('resize', syncVisualViewport);
+    viewport.addEventListener('scroll', syncVisualViewport);
+    return () => {
+      viewport.removeEventListener('resize', syncVisualViewport);
+      viewport.removeEventListener('scroll', syncVisualViewport);
+      document.documentElement.style.removeProperty('--app-visual-height');
+    };
+  }, []);
+
   // Navigation state: 'home' is the default starting page
   const [currentView, setCurrentView] = useState<MainNavView | 'home'>('home');
   const [viewHistory, setViewHistory] = useState<(MainNavView | 'home')[]>(['home']);
