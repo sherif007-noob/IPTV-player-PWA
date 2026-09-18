@@ -1104,11 +1104,12 @@ export default function App() {
                   }`}
                   aria-hidden="true"
                   onPointerDown={(event) => {
-                    event.preventDefault();
+                    // Keep the backdrop mounted for the entire gesture. Do not
+                    // prevent pointerdown: Safari may otherwise suppress the click
+                    // event that owns the actual close.
                     event.stopPropagation();
                   }}
                   onPointerUp={(event) => {
-                    event.preventDefault();
                     event.stopPropagation();
                   }}
                   onClick={(event) => {
