@@ -170,7 +170,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
               : 'glass-control text-slate-300 hover:text-white hover:bg-slate-800/70 hover:border-white/20'
           }`}
         >
-          <Home className="w-4 h-4 text-sky-400" />
+          <Home className={`w-4 h-4 ${currentView === 'home' ? 'text-white' : 'text-sky-400'}`} />
           <span className="text-xs font-semibold hidden sm:inline">Home</span>
         </button>
 
@@ -248,7 +248,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
                 id="btn-clear-header-search"
                 data-skip-spatial="true"
                 onClick={() => onSearchChange('')}
-                className="p-1 rounded text-slate-400 hover:text-white"
+                className="icon-control rounded-lg text-slate-400 hover:text-white"
                 title="Clear search"
               >
                 <X className="w-3.5 h-3.5" />
