@@ -48,6 +48,29 @@ import { useDialog } from './hooks/useDialog';
 
 const APP_SESSION_KEY = 'iptv_app_session_v1';
 const SCROLL_KEY_PREFIX = 'iptv_scroll_v1:';
+const CATALOG_COUNTS_KEY = 'iptv_catalog_counts_v1';
+
+function currentCatalogProviderKey() {
+  const credentials = xtreamService.getCredentials();
+  const server = credentials?.server?.replace(/\/+$/, '') || 'demo';
+  const username = credentials?.username || 'anonymous';
+  return `${server}::${username}`;
+}
+
+function readCatalogCounts(): { provider: string; vod: number; series: number } {
+  const provider = currentCatalogProviderKey();
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CATALOG_COUNTS_KEY) || '{}');
+    if (parsed?.provider !== provider) return { provider, vod: 0, series: 0 };
+    return {
+      provider,
+      vod: Number.isFinite(Number(parsed.vod)) ? Math.max(0, Number(parsed.vod)) : 0,
+      series: Number.isFinite(Number(parsed.series)) ? Math.max(0, Number(parsed.series)) : 0,
+    };
+  } catch {
+    return { provider, vod: 0, series: 0 };
+  }
+}
 
 function readAppSessionState(): { view: MainNavView | 'home'; categoryId: string } {
   try {
@@ -110,6 +133,7 @@ export default function App() {
   const [movies, setMovies] = useState<VodMovie[]>([]);
   const [series, setSeries] = useState<SeriesItem[]>([]);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [catalogCounts, setCatalogCounts] = useState(readCatalogCounts);
   const fullCatalogLoadedRef = useRef({ vod: false, series: false });
   const homeSearchOwnedCatalogsRef = useRef({ vod: false, series: false });
   const loadRequestIdRef = useRef(0);
@@ -295,6 +319,13 @@ export default function App() {
           const vodList = await xtreamService.getVodStreams(catId);
           if (!isCurrentRequest()) return;
           fullCatalogLoadedRef.current.vod = catId === 'all';
+          if (catId === 'all') {
+            setCatalogCounts((previous) => ({
+              ...previous,
+              provider: currentCatalogProviderKey(),
+              vod: vodList.length,
+            }));
+          }
           setMovies(vodList);
           setIsLoadingContent(false);
           await categoriesPromise;
@@ -305,6 +336,13 @@ export default function App() {
           const sList = await xtreamService.getSeries(catId);
           if (!isCurrentRequest()) return;
           fullCatalogLoadedRef.current.series = catId === 'all';
+          if (catId === 'all') {
+            setCatalogCounts((previous) => ({
+              ...previous,
+              provider: currentCatalogProviderKey(),
+              series: sList.length,
+            }));
+          }
           setSeries(sList);
           setIsLoadingContent(false);
           await categoriesPromise;
@@ -330,6 +368,12 @@ export default function App() {
         setServerInfo(auth.server_info);
         setCredentials(xtreamService.getCredentials());
         setIsDemo(xtreamService.getIsDemo());
+        const authenticatedProvider = currentCatalogProviderKey();
+        setCatalogCounts((previous) =>
+          previous.provider === authenticatedProvider
+            ? previous
+            : { provider: authenticatedProvider, vod: 0, series: 0 }
+        );
 
         // Startup stays intentionally light: Live powers Home immediately;
         // VOD/Series categories and catalogs remain on-demand.
@@ -374,6 +418,12 @@ export default function App() {
       }));
     } catch {}
   }, [currentView, selectedCategoryId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CATALOG_COUNTS_KEY, JSON.stringify(catalogCounts));
+    } catch {}
+  }, [catalogCounts]);
 
   const saveCurrentScrollPosition = useCallback(() => {
     const scrollSurface =
@@ -561,6 +611,11 @@ export default function App() {
             if (cancelled) return;
             setMovies(vodList);
             fullCatalogLoadedRef.current.vod = true;
+            setCatalogCounts((previous) => ({
+              ...previous,
+              provider: currentCatalogProviderKey(),
+              vod: vodList.length,
+            }));
             if (owned) homeSearchOwnedCatalogsRef.current.vod = true;
           })
         );
@@ -573,6 +628,11 @@ export default function App() {
             if (cancelled) return;
             setSeries(seriesList);
             fullCatalogLoadedRef.current.series = true;
+            setCatalogCounts((previous) => ({
+              ...previous,
+              provider: currentCatalogProviderKey(),
+              series: seriesList.length,
+            }));
             if (owned) homeSearchOwnedCatalogsRef.current.series = true;
           })
         );
@@ -1147,8 +1207,8 @@ export default function App() {
           <HomePortal
             onSelectSection={handleSelectView}
             liveCount={liveChannels.length}
-            moviesCount={movies.length}
-            seriesCount={series.length}
+            moviesCount={Math.max(catalogCounts.vod, movies.length)}
+            seriesCount={Math.max(catalogCounts.series, series.length)}
             continueWatchingList={storage.continueWatching}
             onResumeRecent={handleResumeProgress}
             onClearContinueWatching={() => storage.clearContinueWatching()}
@@ -1498,7 +1558,14 @@ export default function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onSuccess={() => {
-          setCredentials(xtreamService.getCredentials());
+          const nextCredentials = xtreamService.getCredentials();
+          const nextProvider = currentCatalogProviderKey();
+          setCredentials(nextCredentials);
+          setCatalogCounts((previous) =>
+            previous.provider === nextProvider
+              ? previous
+              : { provider: nextProvider, vod: 0, series: 0 }
+          );
           setUserInfo(xtreamService.getUserInfo());
           setServerInfo(xtreamService.getServerInfo());
           setIsDemo(xtreamService.getIsDemo());
