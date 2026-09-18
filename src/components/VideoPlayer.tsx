@@ -296,6 +296,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const controlsTimerRef = useRef<number | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
   const tapRef = useRef<{ time: number; side: number } | null>(null);
+  const singleTapTimerRef = useRef<number | null>(null);
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const scrubRef = useRef<number | null>(null);
   const [scrubTime, setScrubTime] = useState<number | null>(null);
@@ -310,6 +311,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [buffered, setBuffered] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
   const [seekFeedback, setSeekFeedback] = useState<string | null>(null);
+  const [seekFeedbackSide, setSeekFeedbackSide] = useState<'left' | 'center' | 'right'>('center');
   const [showControls, setShowControls] = useState(true);
   const [showEpisodes, setShowEpisodes] = useState(false);
   const [subtitleTracks, setSubtitleTracks] = useState<{ id: number; label: string; language: string }[]>([]);
@@ -319,24 +321,56 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const isSeries = item.type === 'series' || !!seriesContext;
   const metadataDuration = getKnownDuration(item, seriesContext);
 
-  const revealControls = useCallback(() => {
-    setShowControls(true);
+  const scheduleControlsHide = useCallback(() => {
     if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
-    if (isPlaying && !isBuffering && !playbackError && !showEpisodes && scrubRef.current === null && !keyboardFocus) {
+    controlsTimerRef.current = null;
+    if (
+      isPlaying &&
+      !isBuffering &&
+      !playbackError &&
+      !showEpisodes &&
+      scrubRef.current === null &&
+      !keyboardFocus
+    ) {
       controlsTimerRef.current = window.setTimeout(() => setShowControls(false), 3000);
     }
   }, [isPlaying, isBuffering, playbackError, showEpisodes, keyboardFocus]);
 
+  const revealControls = useCallback(() => {
+    setShowControls(true);
+    scheduleControlsHide();
+  }, [scheduleControlsHide]);
+
+  const toggleControls = useCallback(() => {
+    setShowControls((visible) => {
+      const next = !visible;
+      if (next) {
+        window.setTimeout(scheduleControlsHide, 0);
+      } else if (controlsTimerRef.current !== null) {
+        window.clearTimeout(controlsTimerRef.current);
+        controlsTimerRef.current = null;
+      }
+      return next;
+    });
+  }, [scheduleControlsHide]);
+
   useEffect(() => {
-    revealControls();
-    return () => {
-      if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
-    };
-  }, [revealControls, scrubTime === null]);
+    if (isBuffering || playbackError || showEpisodes || scrubTime !== null || keyboardFocus || !isPlaying) {
+      setShowControls(true);
+      if (controlsTimerRef.current !== null) {
+        window.clearTimeout(controlsTimerRef.current);
+        controlsTimerRef.current = null;
+      }
+      return;
+    }
+    scheduleControlsHide();
+  }, [isBuffering, playbackError, showEpisodes, scrubTime, keyboardFocus, isPlaying, scheduleControlsHide]);
 
   useEffect(() => () => {
     if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
     if (seekRestartTimerRef.current !== null) window.clearTimeout(seekRestartTimerRef.current);
+    if (singleTapTimerRef.current !== null) window.clearTimeout(singleTapTimerRef.current);
+    if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
   }, []);
 
   const buildPlaybackUrl = useCallback((baseUrl: string, startSeconds?: number) => {
@@ -631,7 +665,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }
   }, [activeUrl, buildPlaybackUrl, duration, isLive, isBuffering, safePlay]);
 
-  const handleSeek = useCallback((delta: number) => {
+  const handleSeek = useCallback((delta: number, side: 'left' | 'center' | 'right' = 'center') => {
     const video = videoRef.current;
     if (!video) return;
 
@@ -646,12 +680,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           : currentTime;
 
     const target = base + delta;
-    const applied = seekToPosition(target);
-    if (applied) {
-      setSeekFeedback(`${delta >= 0 ? '+' : ''}${delta}s`);
-      if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
-      feedbackTimerRef.current = window.setTimeout(() => setSeekFeedback(null), 700);
-    }
+    seekToPosition(target);
+    setSeekFeedbackSide(side);
+    setSeekFeedback(`${delta >= 0 ? '+' : ''}${delta}s`);
+    if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
+    feedbackTimerRef.current = window.setTimeout(() => setSeekFeedback(null), 700);
   }, [currentTime, seekToPosition]);
 
   const togglePlay = useCallback(() => {
@@ -776,7 +809,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       style={{ cursor: showControls ? undefined : 'none' }}
       className="fixed inset-0 z-50 bg-black flex items-center justify-center select-none overflow-hidden"
       onPointerMove={(event) => { if (event.pointerType === 'mouse') revealControls(); }}
-      onPointerDown={() => { setKeyboardFocus(false); revealControls(); }}
+      onPointerDown={(event) => {
+        setKeyboardFocus(false);
+        if (event.pointerType === 'mouse') revealControls();
+      }}
       onFocusCapture={(event) => {
         if (event.target !== event.currentTarget && event.target.matches(':focus-visible')) setKeyboardFocus(true);
         revealControls();
@@ -831,27 +867,57 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         className="absolute inset-0 z-10"
         style={{ touchAction: 'manipulation' }}
         aria-label="Playback gesture area"
-        onClick={() => { setShowEpisodes(false); revealControls(); }}
         onPointerDown={(event) => {
           if (!event.isPrimary || event.pointerType === 'mouse') return;
           touchStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now() };
         }}
-        onPointerCancel={() => { touchStartRef.current = null; tapRef.current = null; }}
+        onPointerCancel={() => {
+          touchStartRef.current = null;
+          tapRef.current = null;
+          if (singleTapTimerRef.current !== null) {
+            window.clearTimeout(singleTapTimerRef.current);
+            singleTapTimerRef.current = null;
+          }
+        }}
         onPointerUp={(event) => {
           const start = touchStartRef.current;
           touchStartRef.current = null;
-          if (!start || !event.isPrimary || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 20 || Date.now() - start.time > 350) {
-            tapRef.current = null; return;
+          if (
+            !start ||
+            !event.isPrimary ||
+            Math.hypot(event.clientX - start.x, event.clientY - start.y) > 20 ||
+            Date.now() - start.time > 350
+          ) {
+            tapRef.current = null;
+            return;
           }
-          revealControls();
+
+          const now = Date.now();
           const rect = event.currentTarget.getBoundingClientRect();
           const ratio = (event.clientX - rect.left) / rect.width;
           const side = ratio < 0.4 ? -1 : ratio > 0.6 ? 1 : 0;
           const previous = tapRef.current;
-          if (!isLive && side && previous?.side === side && Date.now() - previous.time < 320) {
-            handleSeek(side * 10);
+
+          if (!isLive && side && previous?.side === side && now - previous.time < 330) {
+            if (singleTapTimerRef.current !== null) {
+              window.clearTimeout(singleTapTimerRef.current);
+              singleTapTimerRef.current = null;
+            }
             tapRef.current = null;
-          } else tapRef.current = { time: Date.now(), side };
+            setShowEpisodes(false);
+            revealControls();
+            handleSeek(side * 10, side < 0 ? 'left' : 'right');
+            return;
+          }
+
+          tapRef.current = { time: now, side };
+          if (singleTapTimerRef.current !== null) window.clearTimeout(singleTapTimerRef.current);
+          singleTapTimerRef.current = window.setTimeout(() => {
+            singleTapTimerRef.current = null;
+            tapRef.current = null;
+            setShowEpisodes(false);
+            toggleControls();
+          }, side && !isLive ? 335 : 120);
         }}
       />
 
@@ -886,8 +952,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       )}
 
       {seekFeedback && (
-        <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
-          <div className="rounded-xl border border-sky-500/50 bg-black/85 px-6 py-4 text-xl font-bold text-white">
+        <div
+          className={`player-seek-feedback absolute inset-y-0 z-30 pointer-events-none flex items-center ${ 
+            seekFeedbackSide === 'left'
+              ? 'left-[12%] justify-start'
+              : seekFeedbackSide === 'right'
+              ? 'right-[12%] justify-end'
+              : 'inset-x-0 justify-center'
+          }`}
+        >
+          <div className="rounded-full border border-sky-500/50 bg-black/75 px-5 py-3 text-lg sm:text-xl font-bold text-white backdrop-blur-md shadow-xl">
             {seekFeedback}
           </div>
         </div>
@@ -911,7 +985,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
           {isSeries && seriesContext?.allEpisodes && seriesContext.allEpisodes.length > 0 && (
             <button
-              onClick={() => setShowEpisodes((value) => !value)}
+              onClick={() => {
+                setShowEpisodes((value) => !value);
+                revealControls();
+              }}
               className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm"
             >
               <Clapperboard className="w-4 h-4" /> Episodes
@@ -936,7 +1013,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   onSelectEpisode?.(episode, seriesContext.seasonNum);
                   setShowEpisodes(false);
                 }}
-                className="w-full text-left rounded-lg border border-slate-800 bg-slate-900 p-3 text-sm text-white"
+                aria-current={episode.id === seriesContext.episode.id ? 'true' : undefined}
+                className={`w-full min-h-12 text-left rounded-lg border p-3 text-sm text-white transition-colors ${ 
+                  episode.id === seriesContext.episode.id
+                    ? 'border-sky-500/60 bg-sky-500/15'
+                    : 'border-slate-800 bg-slate-900'
+                }`}
               >
                 <div className="font-semibold">Episode {episode.episode_num}</div>
                 <div className="text-xs text-slate-400">
@@ -956,6 +1038,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 <div className="absolute inset-y-0 left-0 bg-slate-600/60" style={{ width: `${bufferPercent}%` }} />
                 <div className="absolute inset-y-0 left-0 bg-sky-500" style={{ width: `${progressPercent}%` }} />
               </div>
+              {scrubTime !== null && duration > 0 && (
+                <div
+                  className="player-scrub-preview absolute bottom-9 -translate-x-1/2 pointer-events-none rounded-lg border border-sky-500/40 bg-black/90 px-2.5 py-1.5 text-xs font-mono font-semibold text-white shadow-xl"
+                  style={{ left: `${Math.max(2, Math.min(98, (scrubTime / duration) * 100))}%` }}
+                >
+                  {formatTime(scrubTime)}
+                </div>
+              )}
+              <div
+                className="player-seek-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-lg shadow-sky-500/40 pointer-events-none transition-[left] duration-75"
+                style={{ left: `${progressPercent}%` }}
+              />
               <div
                 role="slider"
                 tabIndex={duration > 0 ? 0 : -1}
@@ -977,7 +1071,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
                   const rect = event.currentTarget.getBoundingClientRect();
                   const target = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) * duration;
-                  scrubRef.current = target; setScrubTime(target);
+                  scrubRef.current = target; setScrubTime(target); revealControls();
                 }}
                 onPointerUp={(event) => {
                   if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
@@ -1014,10 +1108,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
             {!isLive && (
               <>
-                <button onClick={() => handleSeek(-10)} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white flex items-center gap-1 text-sm">
+                <button onClick={() => handleSeek(-10, 'left')} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white flex items-center gap-1 text-sm">
                   <RotateCcw className="w-4 h-4" /> 10s
                 </button>
-                <button onClick={() => handleSeek(10)} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white flex items-center gap-1 text-sm">
+                <button onClick={() => handleSeek(10, 'right')} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white flex items-center gap-1 text-sm">
                   <RotateCw className="w-4 h-4" /> 10s
                 </button>
               </>
