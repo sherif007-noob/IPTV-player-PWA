@@ -1,6 +1,6 @@
 import { ModalShell } from './ModalShell';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Search, X, Tv, Film, Clapperboard, Star, Clock } from 'lucide-react';
+import { Search, X, Tv, Film, Clapperboard, Star } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
 
 interface SearchModalProps {
