@@ -801,6 +801,16 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   touch-action: none;
   overscroll-behavior: none;
 }
+#app-main-body,
+.library-content-stage,
+#main-scrollable-content-grid {
+  min-height: 0;
+}
+#main-scrollable-content-grid {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
 @media (max-width: 767px) {
   #category-sidebar-wrapper {
     width: min(86vw, 320px);
@@ -904,6 +914,18 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 
 /* Short landscape phones/tablets keep vertical chrome compact. */
 @media (max-height: 500px) and (orientation: landscape) {
+  #app-main-body,
+  .library-content-stage {
+    min-height: 0;
+    overflow: hidden;
+  }
+  #main-scrollable-content-grid {
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
   .app-header {
     padding-top: max(6px, env(safe-area-inset-top));
     padding-bottom: 6px;
