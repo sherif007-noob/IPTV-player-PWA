@@ -547,7 +547,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
           <div className="details-series-body p-3 sm:p-4 bg-slate-950 flex-1 min-h-0 flex flex-col space-y-3 overflow-hidden">
             <div className="details-season-toolbar flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-2 shrink-0">
               {/* Season Selection Tabs */}
-              <div className="details-season-tabs flex items-center gap-2 overflow-x-auto">
+              <div className="details-season-tabs flex items-center gap-2 overflow-x-auto" role="tablist" aria-label="Seasons">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1 flex items-center gap-1.5">
                   <Layers className="w-4 h-4 text-sky-400" />
                   Seasons:
@@ -559,6 +559,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                     <button
                       key={sNum}
                       id={`tab-season-${sNum}`}
+                      role="tab"
                       onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
                       onClick={() => selectSeason(sNum)}
                       aria-selected={isActive}
