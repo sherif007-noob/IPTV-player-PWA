@@ -59,7 +59,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
             id="card-portal-live"
             onClick={() => onSelectSection('live')}
             onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-sky-400 focus:border-sky-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-sky-500/20 hover:-translate-y-1 w-full overflow-hidden"
+            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-sky-400 focus:border-sky-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 shadow-xl hover:shadow-sky-500/20 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-36 h-36 bg-sky-500/20 rounded-full blur-2xl group-hover:bg-sky-500/35 transition-all duration-500 pointer-events-none" />
@@ -83,7 +83,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
             id="card-portal-vod"
             onClick={() => onSelectSection('vod')}
             onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-indigo-400 focus:border-indigo-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-indigo-500/20 hover:-translate-y-1 w-full overflow-hidden"
+            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-indigo-400 focus:border-indigo-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 shadow-xl hover:shadow-indigo-500/20 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl group-hover:bg-indigo-500/35 transition-all duration-500 pointer-events-none" />
@@ -109,7 +109,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
             id="card-portal-series"
             onClick={() => onSelectSection('series')}
             onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-violet-400 focus:border-violet-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-violet-500/20 hover:-translate-y-1 w-full overflow-hidden"
+            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-violet-400 focus:border-violet-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 shadow-xl hover:shadow-violet-500/20 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-36 h-36 bg-violet-500/20 rounded-full blur-2xl group-hover:bg-violet-500/35 transition-all duration-500 pointer-events-none" />
@@ -202,7 +202,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
                         <img
                           src={item.poster}
                           alt={item.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          className="w-full h-full object-cover transition-transform duration-500"
                           referrerPolicy="no-referrer"
                           loading="lazy"
                           decoding="async"
