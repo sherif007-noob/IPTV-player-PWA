@@ -77,7 +77,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
       cardClassName="search-modal-card w-full max-w-4xl bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col max-h-[85dvh] shadow-2xl shadow-black/80"
     >
       <div
-        className="contents"
+        className="search-modal-viewport flex min-h-0 w-full flex-col"
         style={visualViewportHeight ? { maxHeight: `${Math.max(280, visualViewportHeight - 24)}px` } : undefined}
       >
         {/* Search Input Bar */}
