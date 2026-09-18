@@ -96,6 +96,12 @@ export default function App() {
   // Search state (Header searchbar)
   const [headerSearchQuery, setHeaderSearchQuery] = useState<string>('');
 
+  useEffect(() => {
+    if (isCompactNavigation && headerSearchQuery.trim()) {
+      setIsSidebarOpen(false);
+    }
+  }, [headerSearchQuery, isCompactNavigation]);
+
   // Active Modals and Player
   const [selectedDetailsItem, setSelectedDetailsItem] = useState<ContentItem | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -404,9 +410,13 @@ export default function App() {
       return;
     }
 
-    // 7. Return to Home starting portal if inside a section
+    // 7. Return to Home starting portal if inside a section.
+    // Reset stale section history so the next Back is meaningful.
     if (currentView !== 'home') {
       setCurrentView('home');
+      setSelectedCategoryId('all');
+      setHeaderSearchQuery('');
+      setViewHistory(['home']);
       return;
     }
 
