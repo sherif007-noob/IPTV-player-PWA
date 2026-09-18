@@ -228,3 +228,10 @@ The controls timer must retain one generation/deadline owner. Do not add a secon
 - Auto-refresh while a special list is open must not start an All-catalog or synthetic-category request.
 - Switching between Movies and Series must release the inactive large catalog from application/service memory while leaving IndexedDB intact.
 - If a released request finishes late, it may persist to IndexedDB but must not repopulate the released hot/service cache.
+
+
+## Home scroll restoration
+
+- Scroll Home below the hero cards, background/reload the page, and verify Home scroll restores without falsely hiding the header.
+- Navigate Home -> section -> Home and verify the previous Home position can be restored from the saved scroll key.
+- Clearing a completed Home global search releases search-owned full catalogs from service/hot memory while leaving IndexedDB intact.
