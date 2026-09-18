@@ -49,12 +49,12 @@ export const HomePortal: React.FC<HomePortalProps> = ({
             id="card-portal-live"
             onClick={() => onSelectSection('live')}
             onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-            className="home-portal-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-white/10 p-8 cursor-pointer tv-focus hover:border-sky-400 focus:border-sky-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-sky-500/20 hover:-translate-y-1 w-full overflow-hidden"
+            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-sky-400 focus:border-sky-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-sky-500/20 hover:-translate-y-1 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-36 h-36 bg-sky-500/20 rounded-full blur-2xl group-hover:bg-sky-500/35 transition-all duration-500 pointer-events-none" />
 
-            <div className="relative w-20 h-20 rounded-3xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center mb-5 group-hover:scale-110 group-focus:scale-110 transition-transform duration-300 shadow-lg shadow-sky-500/20">
+            <div className="relative w-20 h-20 rounded-3xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center mb-5 ambient-icon-bloom group-focus:scale-110 shadow-lg shadow-sky-500/20">
               <Tv className="w-10 h-10 text-sky-400 drop-shadow-[0_0_12px_rgba(56,189,248,0.5)]" />
             </div>
 
@@ -73,12 +73,12 @@ export const HomePortal: React.FC<HomePortalProps> = ({
             id="card-portal-vod"
             onClick={() => onSelectSection('vod')}
             onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-            className="home-portal-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-white/10 p-8 cursor-pointer tv-focus hover:border-indigo-400 focus:border-indigo-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-indigo-500/20 hover:-translate-y-1 w-full overflow-hidden"
+            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-indigo-400 focus:border-indigo-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-indigo-500/20 hover:-translate-y-1 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-36 h-36 bg-indigo-500/20 rounded-full blur-2xl group-hover:bg-indigo-500/35 transition-all duration-500 pointer-events-none" />
 
-            <div className="relative w-20 h-20 rounded-3xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center mb-5 group-hover:scale-110 group-focus:scale-110 transition-transform duration-300 shadow-lg shadow-indigo-500/20">
+            <div className="relative w-20 h-20 rounded-3xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center mb-5 ambient-icon-bloom group-focus:scale-110 shadow-lg shadow-indigo-500/20">
               <Film className="w-10 h-10 text-indigo-400 drop-shadow-[0_0_12px_rgba(129,140,248,0.5)]" />
             </div>
 
@@ -99,12 +99,12 @@ export const HomePortal: React.FC<HomePortalProps> = ({
             id="card-portal-series"
             onClick={() => onSelectSection('series')}
             onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-            className="home-portal-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-white/10 p-8 cursor-pointer tv-focus hover:border-violet-400 focus:border-violet-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-violet-500/20 hover:-translate-y-1 w-full overflow-hidden"
+            className="home-portal-card interactive-card group relative rounded-3xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-8 cursor-pointer tv-focus hover:border-violet-400 focus:border-violet-400 flex flex-col items-center justify-center text-center h-64 hover:bg-slate-800/80 transition-all duration-300 shadow-xl hover:shadow-violet-500/20 hover:-translate-y-1 w-full overflow-hidden"
           >
             {/* Ambient Background Glow */}
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-36 h-36 bg-violet-500/20 rounded-full blur-2xl group-hover:bg-violet-500/35 transition-all duration-500 pointer-events-none" />
 
-            <div className="relative w-20 h-20 rounded-3xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center mb-5 group-hover:scale-110 group-focus:scale-110 transition-transform duration-300 shadow-lg shadow-violet-500/20">
+            <div className="relative w-20 h-20 rounded-3xl bg-violet-500/15 border border-violet-500/30 flex items-center justify-center mb-5 ambient-icon-bloom group-focus:scale-110 shadow-lg shadow-violet-500/20">
               <Clapperboard className="w-10 h-10 text-violet-400 drop-shadow-[0_0_12px_rgba(167,139,250,0.5)]" />
             </div>
 
@@ -145,7 +145,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
                 e.stopPropagation();
                 onClearContinueWatching();
               }}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-300 px-3 py-1.5 rounded-xl bg-slate-900/70 backdrop-blur-md border border-white/10 hover:border-rose-500/50 tv-focus transition-all duration-200 hover:bg-rose-500/10"
+              className="glass-control flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-300 px-3 py-1.5 rounded-xl hover:border-rose-500/50 tv-focus transition-all duration-200 hover:bg-rose-500/10"
               title="Clear continue watching history"
             >
               <Trash2 className="w-3.5 h-3.5 text-rose-400" />
@@ -183,7 +183,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
                     }
                   }}
                   onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-                  className="home-recent-card group relative rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 backdrop-blur-xl border border-white/10 p-4.5 cursor-pointer tv-focus hover:border-sky-400 focus:border-sky-400 hover:bg-slate-800/80 flex flex-col justify-between overflow-hidden transition-all duration-300 shadow-lg hover:shadow-sky-500/15 hover:-translate-y-0.5"
+                  className="home-recent-card interactive-card group relative rounded-2xl bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-white/10 p-4.5 cursor-pointer tv-focus hover:border-sky-400 focus:border-sky-400 hover:bg-slate-800/80 flex flex-col justify-between overflow-hidden shadow-lg hover:shadow-sky-500/15"
                 >
                   <div className="flex items-start gap-3.5">
                     {/* Poster / Thumbnail with Glass Overlay */}
@@ -242,7 +242,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
                             e.stopPropagation();
                             onResumeRecent && onResumeRecent(item);
                           }}
-                          className="home-recent-resume flex items-center gap-1.5 px-3 py-1 rounded-lg bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold shadow-md shadow-sky-500/30 hover:scale-105 transition-all duration-200"
+                          className="home-recent-resume primary-action tv-focus flex items-center gap-1.5 px-3 py-1 rounded-lg text-white text-xs font-bold"
                         >
                           <Play className="w-3 h-3 fill-current" />
                           <span>Resume</span>
@@ -265,7 +265,7 @@ export const HomePortal: React.FC<HomePortalProps> = ({
             })}
           </div>
         ) : (
-          <div className="p-8 rounded-3xl bg-slate-900/50 backdrop-blur-xl border border-white/5 flex flex-col items-center justify-center text-center text-slate-400 space-y-2 shadow-inner">
+          <div className="glass-surface p-8 rounded-3xl flex flex-col items-center justify-center text-center text-slate-400 space-y-2 shadow-inner">
             <History className="w-8 h-8 text-slate-600 mb-1" />
             <p className="text-xs font-medium text-slate-300">
               No recent playback history yet.
