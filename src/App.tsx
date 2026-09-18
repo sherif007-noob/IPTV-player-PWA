@@ -107,6 +107,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
   const lastBackPressTimeRef = useRef<number>(0);
+  const backNavigationRef = useRef<() => void>(() => {});
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
 
@@ -454,6 +455,20 @@ export default function App() {
     handleExitApp,
   ]);
 
+  backNavigationRef.current = handleBackNavigation;
+
+  useEffect(() => {
+    if (!isCompactNavigation || !isSidebarOpen) return;
+    const handleDrawerKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setIsSidebarOpen(false);
+    };
+    window.addEventListener('keydown', handleDrawerKey, true);
+    return () => window.removeEventListener('keydown', handleDrawerKey, true);
+  }, [isCompactNavigation, isSidebarOpen]);
+
   // Trap platform-back only in webOS / installed PWA mode.
   // Normal Safari/desktop browser history remains native instead of being permanently re-pushed.
   useEffect(() => {
@@ -463,13 +478,13 @@ export default function App() {
       window.history.pushState({ app: 'iptv_guard' }, '');
       const handlePopState = (event: PopStateEvent) => {
         event.preventDefault();
-        handleBackNavigation();
+        backNavigationRef.current();
         window.history.pushState({ app: 'iptv_guard' }, '');
       };
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
     } catch {}
-  }, [handleBackNavigation, isStandalonePwa, isWebOSRuntime]);
+  }, [isStandalonePwa, isWebOSRuntime]);
 
   // Resume in-progress titles from HomePortal Jump Back In
   const handleResumeProgress = useCallback(
