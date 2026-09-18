@@ -692,7 +692,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                       <div className="details-episode-actions flex flex-col items-end justify-between gap-1.5 shrink-0 self-center">
                         <div
                           id={`btn-play-ep-${episode.id}`}
-                          className="player-primary-control tv-focus p-1.5 rounded-lg bg-sky-500 text-white group-hover:bg-sky-400 shadow-md transition-all"
+                          className="primary-action tv-focus p-1.5 rounded-lg bg-sky-500 text-white group-hover:bg-sky-400 shadow-md transition-all"
                           title="Play episode"
                         >
                           <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
