@@ -36,6 +36,8 @@ interface AppHeaderProps {
   onSelectFontSize?: (size: TvFontSize) => void;
   isSidebarOpen?: boolean;
   onToggleSidebar?: () => void;
+  isHidden?: boolean;
+  onRequestReveal?: () => void;
 }
 
 const FONT_OPTIONS: { id: TvFontSize; label: string; previewClass: string }[] = [
@@ -61,8 +63,11 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
   onSelectFontSize,
   isSidebarOpen = false,
   onToggleSidebar,
+  isHidden = false,
+  onRequestReveal,
 }) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const headerRef = useRef<HTMLElement | null>(null);
   const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
   const fontMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -74,6 +79,27 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
     };
     document.addEventListener('pointerdown', handleClickOutside);
     return () => document.removeEventListener('pointerdown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const syncHeight = () => {
+      const height = Math.ceil(header.getBoundingClientRect().height);
+      if (height > 0) {
+        document.documentElement.style.setProperty('--app-header-height', `${height}px`);
+      }
+    };
+
+    syncHeight();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncHeight) : null;
+    observer?.observe(header);
+    window.addEventListener('resize', syncHeight);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', syncHeight);
+    };
   }, []);
 
   const sections: { id: MainNavView; label: string; icon: any }[] = [
@@ -95,9 +121,14 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
 
   return (
     <header
+      ref={headerRef}
       id="app-top-header"
       aria-label="Primary navigation"
-      className="app-header h-16 px-3 sm:px-6 bg-slate-950/58 backdrop-blur-2xl border-b border-white/10 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0 select-none shadow-lg shadow-black/35"
+      data-hidden={isHidden ? 'true' : 'false'}
+      onFocusCapture={() => onRequestReveal?.()}
+      className={`app-header app-header-overlay glass-chrome h-16 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4 z-20 shrink-0 select-none ${
+        isHidden ? 'app-header-hidden' : ''
+      }`}
     >
       {/* Brand & Home Navigation */}
       <div className="app-header-primary flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -115,7 +146,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           aria-label={currentView === 'home' ? 'Browse Live TV categories' : 'Toggle categories sidebar'}
           aria-controls="category-sidebar-wrapper"
           aria-expanded={currentView !== 'home' ? isSidebarOpen : false}
-          className={`flex items-center justify-center p-2 rounded-xl border tv-focus transition-all duration-200 ${
+          className={`header-control header-icon-control-mobile flex items-center justify-center p-2 rounded-xl border tv-focus transition-all duration-200 ${
             isSidebarOpen && currentView !== 'home'
               ? 'bg-sky-500/20 text-sky-400 border-sky-400/50 shadow-sm shadow-sky-500/20'
               : 'bg-slate-900/70 backdrop-blur-md border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
@@ -133,7 +164,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           onClick={onNavigateHome}
           onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
           title="Return to Home Dashboard"
-          className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl border tv-focus transition-all duration-200 ${
+          className={`header-control header-icon-control-mobile flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-xl border tv-focus transition-all duration-200 ${
             currentView === 'home'
               ? 'bg-sky-500 text-white border-sky-300 font-bold shadow-md shadow-sky-500/30'
               : 'bg-slate-900/70 backdrop-blur-md border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
@@ -175,7 +206,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
                 aria-label={sec.label}
                 onClick={() => onSelectView(sec.id)}
                 onPointerEnter={(e) => { if (e.pointerType === 'mouse') e.currentTarget.focus({ preventScroll: true }); }}
-                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold tv-focus transition-all duration-200 ${
+                className={`header-control flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold tv-focus transition-all duration-200 ${
                   isActive
                     ? 'bg-sky-500 text-white border border-sky-300 font-bold shadow-md shadow-sky-500/30'
                     : 'bg-slate-900/60 backdrop-blur-md border border-white/10 text-slate-300 hover:text-white hover:bg-slate-800/80 hover:border-white/20'
@@ -208,7 +239,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
               }
             }}
             placeholder={searchPlaceholder}
-            className="w-full bg-slate-900/70 backdrop-blur-md border border-white/10 rounded-xl pl-9 pr-16 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-sky-400 focus:shadow-[0_0_15px_rgba(56,189,248,0.25)] font-medium transition-all duration-200"
+            className="header-search-input glass-control w-full rounded-xl pl-9 pr-16 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-sky-400 focus:shadow-[0_0_15px_rgba(56,189,248,0.25)] font-medium transition-all duration-200"
           />
 
           <div className="absolute right-2.5 flex items-center gap-1.5">
@@ -242,7 +273,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           onClick={onRefresh}
           disabled={isRefreshing}
           title="Refresh credentials & Xtream content"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/58 backdrop-blur-md hover:bg-slate-800/75 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold disabled:opacity-50 tv-focus transition-all duration-200"
+          className="header-control flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-control hover:bg-slate-800/75 text-slate-300 hover:text-white text-xs font-semibold disabled:opacity-50 tv-focus transition-all duration-200"
         >
           <RefreshCw
             className={`w-3.5 h-3.5 text-sky-400 ${isRefreshing ? 'animate-spin' : ''}`}
@@ -265,7 +296,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
             aria-expanded={isFontMenuOpen}
             aria-controls="font-size-dropdown-menu"
             title="TV Screen Font Scale & Readability"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/58 backdrop-blur-md hover:bg-slate-800/75 text-slate-200 border border-white/10 text-xs font-semibold tv-focus transition-all duration-200"
+            className="header-control flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-control hover:bg-slate-800/75 text-slate-200 text-xs font-semibold tv-focus transition-all duration-200"
           >
             <Type className="w-3.5 h-3.5 text-sky-400 shrink-0" />
             <span className="text-xs font-medium text-sky-300 font-sans">
@@ -278,7 +309,7 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
             <div
               id="font-size-dropdown-menu"
               role="menu"
-              className="absolute right-0 mt-2 w-56 bg-slate-900/72 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl p-1.5 z-50 flex flex-col space-y-1"
+              className="glass-surface absolute right-0 mt-2 w-56 rounded-xl p-1.5 z-50 flex flex-col space-y-1"
             >
               <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800">
                 TV Screen UI Scale
@@ -318,14 +349,14 @@ export const AppHeaderComponent: React.FC<AppHeaderProps> = ({
           data-skip-spatial="true"
           onClick={onOpenSettings}
           title="Configure Xtream Codes Server"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/58 backdrop-blur-md hover:bg-slate-800/75 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold tv-focus transition-all duration-200"
+          className="header-control header-icon-control-mobile flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-control hover:bg-slate-800/75 text-slate-300 hover:text-white text-xs font-semibold tv-focus transition-all duration-200"
         >
           <Settings className="w-3.5 h-3.5 text-indigo-400" />
           <span className="hidden md:inline">Settings</span>
         </button>
 
         {/* Hardware 4K Badge */}
-        <div className="hidden xl:flex items-center gap-1 text-[11px] text-slate-400 font-mono bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
+        <div className="hidden xl:flex header-control glass-control items-center gap-1 text-[11px] text-slate-400 font-mono px-2.5 py-1 rounded-lg">
           <Wifi className="w-3 h-3 text-emerald-400" />
           <span>4K HW</span>
         </div>
