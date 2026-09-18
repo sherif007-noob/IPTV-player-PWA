@@ -6,6 +6,7 @@ import { MOCK_MOVIES, MOCK_SERIES } from './services/mockData';
 const TTL_MS = 6 * 60 * 60 * 1000;
 const inFlight = new Map<string, Promise<any[]>>();
 const hotCatalogs = new Map<string, { updatedAt: number; data: any[] }>();
+let memoryGeneration = 0;
 
 function hotKey(provider: string, kind: 'vod' | 'series', categoryId: string) {
   return `${provider}::${kind}::${categoryId}`;
@@ -38,11 +39,17 @@ async function persistRealCatalog<T>(
   provider: string,
   kind: 'vod' | 'series',
   categoryId: string,
-  data: T[]
+  data: T[],
+  requestGeneration: number
 ) {
   if (!data.length || xtreamService.getIsDemo() || matchesMockCatalog(kind, data as any[])) return;
-  rememberHot(provider, kind, categoryId, data);
+  if (requestGeneration === memoryGeneration) {
+    rememberHot(provider, kind, categoryId, data);
+  }
   await writeCatalog(provider, kind, categoryId, data);
+  if (requestGeneration !== memoryGeneration) {
+    xtreamService.clearCache();
+  }
 }
 
 const originalVod = xtreamService.getVodStreams.bind(xtreamService);
@@ -122,10 +129,11 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
       // Force the wrapped service's own RAM cache cold so stale-while-revalidate
       // actually reaches the provider instead of recycling an old in-memory array.
       xtreamService.clearCache();
+      const requestGeneration = memoryGeneration;
       void deduped(
         `${provider}:vod:${key}`,
         () => originalVod(key),
-        (data) => persistRealCatalog(provider, 'vod', key, data)
+        (data) => persistRealCatalog(provider, 'vod', key, data, requestGeneration)
       ).catch((error) => console.warn('Background VOD refresh notice:', error));
     }
     return exact.data;
@@ -138,10 +146,11 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
   const filtered = await readFromAll<VodMovie>(provider, 'vod', key);
   if (filtered?.length) return filtered;
 
+  const requestGeneration = memoryGeneration;
   const data = await deduped(
     `${provider}:vod:${key}`,
     () => originalVod(key),
-    (result) => persistRealCatalog(provider, 'vod', key, result)
+    (result) => persistRealCatalog(provider, 'vod', key, result, requestGeneration)
   );
   if (!xtreamService.getIsDemo() && matchesMockCatalog('vod', data)) {
     throw new Error('VOD provider request failed; demo fallback was rejected.');
@@ -164,10 +173,11 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
     rememberHot(provider, 'series', key, exact.data, exact.updatedAt);
     if (Date.now() - exact.updatedAt > TTL_MS) {
       xtreamService.clearCache();
+      const requestGeneration = memoryGeneration;
       void deduped(
         `${provider}:series:${key}`,
         () => originalSeries(key),
-        (data) => persistRealCatalog(provider, 'series', key, data)
+        (data) => persistRealCatalog(provider, 'series', key, data, requestGeneration)
       ).catch((error) => console.warn('Background Series refresh notice:', error));
     }
     return exact.data;
@@ -180,10 +190,11 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   const filtered = await readFromAll<SeriesItem>(provider, 'series', key);
   if (filtered?.length) return filtered;
 
+  const requestGeneration = memoryGeneration;
   const data = await deduped(
     `${provider}:series:${key}`,
     () => originalSeries(key),
-    (result) => persistRealCatalog(provider, 'series', key, result)
+    (result) => persistRealCatalog(provider, 'series', key, result, requestGeneration)
   );
   if (!xtreamService.getIsDemo() && matchesMockCatalog('series', data)) {
     throw new Error('Series provider request failed; demo fallback was rejected.');
@@ -192,6 +203,7 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
 };
 
 export function releaseCatalogMemory() {
+  memoryGeneration += 1;
   hotCatalogs.clear();
   xtreamService.clearCache();
 }
