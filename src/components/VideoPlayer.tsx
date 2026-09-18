@@ -393,9 +393,33 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [cancelControlsHide, setControlsVisible]);
 
   const toggleControls = useCallback(() => {
+    const controlsArePinned =
+      !isPlaying ||
+      isBuffering ||
+      !!playbackError ||
+      showEpisodes ||
+      scrubRef.current !== null ||
+      keyboardFocus;
+
+    if (controlsArePinned) {
+      cancelControlsHide();
+      setControlsVisible(true);
+      return;
+    }
+
     if (showControlsRef.current) hideControls();
     else revealControls();
-  }, [hideControls, revealControls]);
+  }, [
+    isPlaying,
+    isBuffering,
+    playbackError,
+    showEpisodes,
+    keyboardFocus,
+    cancelControlsHide,
+    setControlsVisible,
+    hideControls,
+    revealControls,
+  ]);
 
   useEffect(() => {
     if (isBuffering || playbackError || showEpisodes || scrubTime !== null || keyboardFocus || !isPlaying) {
@@ -951,9 +975,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         onPointerUp={(event) => {
           if (event.pointerType === 'mouse') {
             if (!event.isPrimary || event.button !== 0) return;
-            setShowEpisodes(false);
-            if (mouseClickStartedVisibleRef.current) hideControls();
-            else revealControls();
+            if (showEpisodes) {
+              setShowEpisodes(false);
+              revealControls();
+            } else if (mouseClickStartedVisibleRef.current && isPlaying && !isBuffering && !playbackError) {
+              hideControls();
+            } else {
+              revealControls();
+            }
             return;
           }
 
