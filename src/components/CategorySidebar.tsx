@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Layers,
   Search,
@@ -42,6 +42,10 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
 }) => {
   const [filterQuery, setFilterQuery] = useState('');
 
+  useEffect(() => {
+    setFilterQuery('');
+  }, [title]);
+
   const isLiveTV = title.toLowerCase().includes('live');
   const continueWatchingLabel = isLiveTV ? 'Watch Again' : 'Continue Watching';
 
@@ -56,6 +60,8 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
   return (
     <div
       id="category-sidebar-panel"
+      role="navigation"
+      aria-label={`${title} categories`}
       className="w-72 sm:w-80 md:w-64 max-w-[85vw] h-full bg-slate-950/95 md:bg-slate-950/80 backdrop-blur-xl border-r border-white/10 flex flex-col shrink-0 select-none shadow-2xl md:shadow-xl"
     >
       {/* Category Header */}
@@ -76,7 +82,8 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
                 id="btn-close-category-sidebar"
                 onClick={onClose}
                 title="Close Categories Sidebar"
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                aria-label="Close categories"
+                className="md:hidden p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -93,6 +100,13 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
             placeholder="Filter categories..."
+            aria-label={`Filter ${title} categories`}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                if (filterQuery) setFilterQuery('');
+                else onClose?.();
+              }
+            }}
             className="w-full bg-slate-900/70 backdrop-blur-md border border-white/10 rounded-xl pl-8 pr-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-400 focus:outline-none focus:border-sky-400 focus:shadow-[0_0_12px_rgba(56,189,248,0.25)] transition-all duration-200"
           />
         </div>
@@ -104,6 +118,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
           {/* 1. All Content */}
           <button
             id="category-item-all"
+            aria-current={selectedCategoryId === 'all' ? 'page' : undefined}
             onClick={() => onSelectCategory('all')}
             className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between tv-focus transition-all duration-200 ${
               selectedCategoryId === 'all'
@@ -131,6 +146,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
           {/* 2. Favorites */}
           <button
             id="category-item-favorites"
+            aria-current={selectedCategoryId === 'special_favorites' ? 'page' : undefined}
             onClick={() => onSelectCategory('special_favorites')}
             className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between tv-focus transition-all duration-200 ${
               selectedCategoryId === 'special_favorites'
@@ -156,6 +172,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
           {/* 3. Continue Watching (or Watch Again for Live TV) */}
           <button
             id="category-item-continue"
+            aria-current={selectedCategoryId === 'special_continue' ? 'page' : undefined}
             onClick={() => onSelectCategory('special_continue')}
             className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between tv-focus transition-all duration-200 ${
               selectedCategoryId === 'special_continue'
@@ -181,6 +198,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
           {/* 4. Watchlist (for Movies and Series) */}
           <button
             id="category-item-watchlist"
+            aria-current={selectedCategoryId === 'special_watchlist' ? 'page' : undefined}
             onClick={() => onSelectCategory('special_watchlist')}
             className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between tv-focus transition-all duration-200 ${
               selectedCategoryId === 'special_watchlist'
@@ -218,6 +236,7 @@ const CategorySidebarComponent: React.FC<CategorySidebarProps> = ({
             <button
               key={category.category_id}
               id={`category-item-${category.category_id}`}
+              aria-current={isSelected ? 'page' : undefined}
               onClick={() => onSelectCategory(category.category_id)}
               className={`w-full text-left px-2.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between tv-focus ${
                 isSelected
