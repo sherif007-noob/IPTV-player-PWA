@@ -112,3 +112,8 @@ Home's "search all library titles" behavior is lazy: the first active Home searc
 Episode progress is retained per episode so Details can calculate/resume episode-level state. User-facing Continue Watching grids collapse multiple episode records from the same Series into one Series card, using the newest stored order.
 
 Playback progress mutations synchronously write the updated progress list to localStorage. The normal React persistence effect remains as a backup, but iOS background/pagehide safety does not depend on that later effect running.
+
+
+## Provider failure / demo fallback safety
+
+The underlying Xtream service can return built-in demo arrays when a provider request fails. The persistent wrapper compares returned catalogs against the exported demo fixtures and does **not** write those fallback arrays to hot cache or IndexedDB for a real provider. This prevents a transient network/provider failure from poisoning the persistent catalog for the normal TTL.
