@@ -142,7 +142,7 @@ video {
   width: 100vw;
   width: 100dvw;
   height: 100vh;
-  height: 100dvh;
+  height: var(--app-visual-height, 100dvh);
   padding:
     max(12px, env(safe-area-inset-top))
     max(12px, env(safe-area-inset-right))
@@ -151,7 +151,7 @@ video {
 }
 .modal-shell-card {
   max-width: calc(100dvw - max(24px, env(safe-area-inset-left) + env(safe-area-inset-right)));
-  max-height: calc(100dvh - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  max-height: calc(var(--app-visual-height, 100dvh) - max(24px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
 }
 html.modal-open,
 html.modal-open body {
