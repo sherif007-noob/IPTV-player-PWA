@@ -235,3 +235,10 @@ The controls timer must retain one generation/deadline owner. Do not add a secon
 - Scroll Home below the hero cards, background/reload the page, and verify Home scroll restores without falsely hiding the header.
 - Navigate Home -> section -> Home and verify the previous Home position can be restored from the saved scroll key.
 - Clearing a completed Home global search releases search-owned full catalogs from service/hot memory while leaving IndexedDB intact.
+
+
+## Provider/cache identity regression
+
+- Open VOD/Series details on provider/account A, switch credentials to provider/account B, then open the same numeric content ID. Provider B must not receive provider A's cached detail payload.
+- Start a large catalog request, trigger manual Refresh before it completes, and allow the old request to finish. The pre-refresh result must not repopulate IndexedDB after persistent invalidation.
+- Navigation-only memory release may still allow a useful late catalog result to persist to IndexedDB, but it must not repopulate released hot/service RAM.
