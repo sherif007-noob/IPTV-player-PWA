@@ -31,6 +31,7 @@ import {
   TvFontSize,
 } from './types';
 import { xtreamService } from './services/xtream';
+import { invalidatePersistentCatalogs } from './catalogPersistence';
 import { useStorage } from './hooks/useStorage';
 import { useWebOSRemote } from './hooks/useWebOSRemote';
 import { AppHeader } from './components/AppHeader';
@@ -44,6 +45,24 @@ import { RemoteControlHUD } from './components/RemoteControlHUD';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { ModalShell } from './components/ModalShell';
 import { useDialog } from './hooks/useDialog';
+
+const APP_SESSION_KEY = 'iptv_app_session_v1';
+const SCROLL_KEY_PREFIX = 'iptv_scroll_v1:';
+
+function readAppSessionState(): { view: MainNavView | 'home'; categoryId: string } {
+  try {
+    const raw = localStorage.getItem(APP_SESSION_KEY);
+    if (!raw) return { view: 'home', categoryId: 'all' };
+    const parsed = JSON.parse(raw);
+    const allowed = new Set(['home', 'live', 'vod', 'series', 'favorites', 'watchlist', 'continue_watching', 'settings']);
+    return {
+      view: allowed.has(parsed?.view) ? parsed.view : 'home',
+      categoryId: typeof parsed?.categoryId === 'string' ? parsed.categoryId : 'all',
+    };
+  } catch {
+    return { view: 'home', categoryId: 'all' };
+  }
+}
 
 export default function App() {
   const storage = useStorage();
@@ -78,12 +97,14 @@ export default function App() {
     };
   }, []);
 
-  // Navigation state: 'home' is the default starting page
-  const [currentView, setCurrentView] = useState<MainNavView | 'home'>('home');
+  const initialSessionState = useMemo(() => readAppSessionState(), []);
+
+  // Navigation state restored after iOS/Safari discards the page process.
+  const [currentView, setCurrentView] = useState<MainNavView | 'home'>(initialSessionState.view);
   const [viewHistory, setViewHistory] = useState<(MainNavView | 'home')[]>(['home']);
 
   // Category and Content state
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>(initialSessionState.categoryId);
   const [categories, setCategories] = useState<XtreamCategory[]>([]);
   const [liveChannels, setLiveChannels] = useState<LiveChannel[]>([]);
   const [movies, setMovies] = useState<VodMovie[]>([]);
@@ -230,16 +251,12 @@ export default function App() {
         if (liveStreams.status === 'fulfilled') setLiveChannels(liveStreams.value);
         if (liveCats.status === 'fulfilled') setCategories(liveCats.value);
 
-        // Preload VOD & Series in background without blocking initial UI interactivity
-        setTimeout(() => {
-          xtreamService.getVodStreams('all').then((vods) => {
-            if (vods && vods.length > 0) setMovies(vods);
-          }).catch((err) => console.warn('Background VOD preload notice:', err.message));
-
-          xtreamService.getSeries('all').then((sList) => {
-            if (sList && sList.length > 0) setSeries(sList);
-          }).catch((err) => console.warn('Background Series preload notice:', err.message));
-        }, 1000);
+        // Do not preload the huge VOD/Series catalogs on startup. They are restored
+        // from IndexedDB or fetched only when the user opens that section.
+        if (currentView !== 'home') {
+          const restoredCategory = selectedCategoryId.startsWith('special_') ? 'all' : selectedCategoryId;
+          await loadViewData(currentView as MainNavView, restoredCategory);
+        }
       } catch (err) {
         console.warn('Initial authentication attempt:', err);
         setCredentials(xtreamService.getCredentials());
@@ -252,6 +269,39 @@ export default function App() {
     };
     init();
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(APP_SESSION_KEY, JSON.stringify({
+        view: currentView,
+        categoryId: selectedCategoryId,
+      }));
+    } catch {}
+  }, [currentView, selectedCategoryId]);
+
+  const saveCurrentScrollPosition = useCallback(() => {
+    const grid = document.getElementById('main-scrollable-content-grid');
+    if (!grid) return;
+    try {
+      localStorage.setItem(
+        `${SCROLL_KEY_PREFIX}${currentView}:${selectedCategoryId}`,
+        String(grid.scrollTop)
+      );
+    } catch {}
+  }, [currentView, selectedCategoryId]);
+
+  useEffect(() => {
+    const saveForBackground = () => {
+      if (document.visibilityState === 'hidden') saveCurrentScrollPosition();
+    };
+    const saveForPageHide = () => saveCurrentScrollPosition();
+    document.addEventListener('visibilitychange', saveForBackground);
+    window.addEventListener('pagehide', saveForPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', saveForBackground);
+      window.removeEventListener('pagehide', saveForPageHide);
+    };
+  }, [saveCurrentScrollPosition]);
 
   // Navigation handlers
   const handleSelectView = (view: MainNavView, initialCategoryId: string = 'all') => {
@@ -303,6 +353,7 @@ export default function App() {
     setRefreshNotice('Refreshing credentials & Xtream playlists...');
     try {
       xtreamService.clearCache();
+      invalidatePersistentCatalogs();
       await xtreamService.authenticate();
       setUserInfo(xtreamService.getUserInfo());
       setServerInfo(xtreamService.getServerInfo());
@@ -711,13 +762,32 @@ export default function App() {
     return currentGridItems.slice(0, visibleCount);
   }, [currentGridItems, visibleCount]);
 
+  const scrollSaveTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isLoadingContent) return;
+    const key = `${SCROLL_KEY_PREFIX}${currentView}:${selectedCategoryId}`;
+    const restore = window.requestAnimationFrame(() => {
+      const grid = document.getElementById('main-scrollable-content-grid');
+      if (!grid) return;
+      const saved = Number(localStorage.getItem(key) || 0);
+      if (Number.isFinite(saved) && saved > 0) grid.scrollTop = saved;
+    });
+    return () => window.cancelAnimationFrame(restore);
+  }, [currentView, selectedCategoryId, isLoadingContent, displayedGridItems.length]);
+
   const handleGridScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-    if (scrollHeight - scrollTop - clientHeight < 600) {
-      if (visibleCount < currentGridItems.length) {
-        setVisibleCount((prev) => Math.min(prev + 48, currentGridItems.length));
-      }
+    if (scrollHeight - scrollTop - clientHeight < 600 && visibleCount < currentGridItems.length) {
+      setVisibleCount((prev) => Math.min(prev + 48, currentGridItems.length));
     }
+
+    if (scrollSaveTimerRef.current !== null) window.clearTimeout(scrollSaveTimerRef.current);
+    const key = `${SCROLL_KEY_PREFIX}${currentView}:${selectedCategoryId}`;
+    scrollSaveTimerRef.current = window.setTimeout(() => {
+      try { localStorage.setItem(key, String(scrollTop)); } catch {}
+      scrollSaveTimerRef.current = null;
+    }, 180);
   };
 
   // Section-specific counts for the category sidebar
