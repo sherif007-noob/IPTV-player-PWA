@@ -178,3 +178,36 @@ The controls timer must retain one generation/deadline owner. Do not add a secon
 - If iOS discards/reloads the page, stable section/category and saved scroll state should restore.
 - Playback progress must be flushed on background/pagehide so a killed page can resume near the last recorded position.
 - Do not expect the actual decoder/video element to survive an OS process kill.
+
+
+## Pass 6 integration regressions
+
+### Catalog / memory
+- Enter a specific Movies category, then start a Home global search. Results must eventually include the full Movies + Series libraries, not only the previously loaded category subset.
+- End the Home search while staying on Home; VOD/Series arrays loaded only for search should be released from React state while IndexedDB remains reusable.
+- From Movies or Series, open Favorites/Watchlist/Continue Watching. This must not trigger a full `get_vod_streams(all)` / `get_series(all)` provider fetch just to render the special list.
+- Returning from a special list to All should reload from hot cache/IndexedDB/network as needed.
+- A category-specific fetch must not leave the app believing the React array is a complete All catalog.
+- Provider failures that return the built-in demo fixture must not persist that fixture to hot cache or IndexedDB for a real provider.
+- Legacy demo-fallback cache entries should self-heal instead of being served indefinitely.
+
+### Progress / iOS lifecycle
+- Background/pagehide playback progress must be present in localStorage immediately after the player flush callback; it must not depend only on a later React effect.
+- VOD/Series/Live entries with the same numeric ID must not read or delete one another's playback progress.
+- Multiple stored episode-progress records for one Series should render as one Series card in Continue Watching/Home.
+- Episode-level progress must still remain available inside Series details.
+
+### Player pinned states
+- While paused, tapping/clicking the video cannot hide the controls.
+- While buffering, the OSD remains visible.
+- While Episodes is open, controls remain visible; clicking the video closes Episodes and leaves the OSD visible.
+- Resume playback and verify normal 3-second auto-hide returns.
+
+### Sidebar gesture
+- On iPhone/iPad, tap the category backdrop once: the drawer closes.
+- The same gesture must not activate the card underneath.
+- Repeat with a quick tap and a slightly longer press to catch Safari synthetic-click differences.
+
+### Global surfaces
+- webOS Magic Remote HUD uses the same glass/focus language as the rest of the application.
+- Offline indicator is restrained glass/amber status UI and does not bounce continuously.
