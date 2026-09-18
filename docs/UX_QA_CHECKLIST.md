@@ -211,3 +211,12 @@ The controls timer must retain one generation/deadline owner. Do not add a secon
 ### Global surfaces
 - webOS Magic Remote HUD uses the same glass/focus language as the rest of the application.
 - Offline indicator is restrained glass/amber status UI and does not bounce continuously.
+
+
+## Async/catalog race regression
+
+- Rapidly switch Movies -> Series -> Live while catalogs are loading; a late response from the old section must not replace the active section's categories/content.
+- Select Favorites/Continue/Watchlist while a normal category request is pending; the stale request must not overwrite the special list.
+- Opening a special list must not trigger an unnecessary full VOD/Series provider catalog fetch.
+- Returning Home releases large catalog arrays from active application/service memory; returning to the section may rehydrate them from IndexedDB.
+- Home global search lazily loads missing full catalogs and releases search-only catalog memory when abandoned.
