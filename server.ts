@@ -21,6 +21,7 @@ type StopFn = (reason: string) => void;
 async function startServer() {
   const app = express();
   const active = new Map<string, { playback: string; stop: StopFn }>();
+  const bridgeInputs = new Map<string, { url: string; headers: Record<string, string> }>();
 
   app.use(express.json());
   app.use("/api", (req, res, next) => {
@@ -189,6 +190,58 @@ async function startServer() {
     return "";
   }
 
+  app.all("/api/internal/hls-input/:token", async (req, res) => {
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      return res.status(405).send("Method Not Allowed");
+    }
+
+    const remote = String(req.socket.remoteAddress || "");
+    const loopback =
+      remote === "127.0.0.1" ||
+      remote === "::1" ||
+      remote === "::ffff:127.0.0.1";
+    if (!loopback) return res.status(403).send("Loopback only");
+
+    const input = bridgeInputs.get(String(req.params.token || ""));
+    if (!input) return res.status(404).send("Expired HLS input");
+
+    try {
+      const headers: Record<string, string> = { ...input.headers };
+      if (typeof req.headers.range === "string") headers.Range = req.headers.range;
+
+      const upstream = await fetch(input.url, {
+        method: req.method,
+        headers,
+        redirect: "follow",
+        signal: AbortSignal.timeout(120000),
+      });
+
+      if (!upstream.ok && upstream.status >= 400) {
+        return res.status(upstream.status).send(`Upstream bridge error: ${upstream.status}`);
+      }
+
+      const responseHeaders: Record<string, string> = {
+        "Content-Type": contentType(upstream.headers.get("content-type"), "application/octet-stream"),
+        "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
+        "Cache-Control": "no-store",
+      };
+      for (const key of ["content-length", "content-range", "etag", "last-modified"]) {
+        const value = upstream.headers.get(key);
+        if (value) responseHeaders[key] = value;
+      }
+
+      res.writeHead(upstream.status, responseHeaders);
+      if (req.method === "HEAD" || !upstream.body) return res.end();
+
+      const readable = Readable.fromWeb(upstream.body as any);
+      res.on("close", () => { try { readable.destroy(); } catch {} });
+      return readable.pipe(res);
+    } catch (error: any) {
+      console.warn(`HLS input bridge error token=${req.params.token}: ${error?.message || error}`);
+      if (!res.headersSent) return res.status(502).send("HLS input bridge failed");
+    }
+  });
+
   async function startGeneratedHls(
     url: string,
     req: express.Request,
@@ -205,36 +258,19 @@ async function startServer() {
     const dir = hlsDir(session, playback);
     await fs.promises.mkdir(dir, { recursive: true });
 
-    const abortController = new AbortController();
-    let upstream: Response;
-    try {
-      console.log(
-        `Fetching provider media in Node session=${session} playback=${playback} start=${start}s url=${url}`
-      );
-      upstream = await fetch(url, {
-        method: "GET",
-        headers: upstreamHeaders(req),
-        redirect: "follow",
-        signal: abortController.signal,
-      });
-    } catch (error: any) {
-      throw new Error(`Provider fetch failed: ${error?.message || error}`);
-    }
+    const bridgeToken = `${session}--${playback}`;
+    bridgeInputs.set(bridgeToken, {
+      url,
+      headers: upstreamHeaders(req),
+    });
 
-    console.log(
-      `Provider media response status=${upstream.status} type=${upstream.headers.get("content-type") || "unknown"} length=${upstream.headers.get("content-length") || "unknown"} finalUrl=${upstream.url || url}`
-    );
-
-    if (!upstream.ok || !upstream.body) {
-      try { await upstream.body?.cancel(); } catch {}
-      throw new Error(`Provider media request failed with HTTP ${upstream.status}`);
-    }
-
+    const bridgeUrl = `http://127.0.0.1:${PORT}/api/internal/hls-input/${encodeURIComponent(bridgeToken)}`;
     const playlist = path.join(dir, "index.m3u8");
     const segmentPattern = path.join(dir, "segment-%06d.ts");
     const args = [
       "-hide_banner", "-loglevel", "info", "-nostdin",
-      "-i", "pipe:0",
+      ...(start > 0 ? ["-ss", String(start)] : []),
+      "-i", bridgeUrl,
       ...hlsTranscodeArgs(),
       "-f", "hls",
       "-hls_time", "2",
@@ -246,11 +282,10 @@ async function startServer() {
     ];
 
     console.log(
-      `Starting generated HLS from Node pipe session=${session} playback=${playback} start=${start}s source=${upstream.url || url}`
+      `Starting generated HLS via seekable Node bridge session=${session} playback=${playback} start=${start}s source=${url}`
     );
 
-    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "ignore", "pipe"] });
-    const readable = Readable.fromWeb(upstream.body as any);
+    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stopped = false;
     let stderr = "";
 
@@ -258,29 +293,12 @@ async function startServer() {
       if (stopped) return;
       stopped = true;
       console.log(`Generated HLS stop session=${session} playback=${playback}: ${reason}`);
-      try { abortController.abort(); } catch {}
-      try { readable.destroy(); } catch {}
-      try { ffmpeg.stdin.destroy(); } catch {}
+      bridgeInputs.delete(bridgeToken);
       try { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); } catch {}
       removePathSoon(dir);
     };
 
     register(session, playback, stop);
-
-    readable.on("error", (error: any) => {
-      if (!stopped) console.warn(
-        `Provider stream error session=${session} playback=${playback}: ${error?.message || error}`
-      );
-      try { ffmpeg.stdin.destroy(error); } catch {}
-    });
-
-    ffmpeg.stdin.on("error", (error: any) => {
-      if (!stopped && error?.code !== "EPIPE") {
-        console.warn(
-          `FFmpeg HLS stdin error session=${session} playback=${playback}: ${error?.message || error}`
-        );
-      }
-    });
 
     ffmpeg.stderr.on("data", (chunk) => {
       const text = chunk.toString();
@@ -289,25 +307,21 @@ async function startServer() {
     });
 
     ffmpeg.on("error", (error) => {
+      bridgeInputs.delete(bridgeToken);
       console.warn(
         `FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`
       );
       clearActive(session, playback);
-      try { abortController.abort(); } catch {}
-      try { readable.destroy(); } catch {}
     });
 
     ffmpeg.on("close", (code, signal) => {
+      bridgeInputs.delete(bridgeToken);
       clearActive(session, playback);
-      try { abortController.abort(); } catch {}
-      try { readable.destroy(); } catch {}
       console.log(
         `FFmpeg HLS exited code=${code} signal=${signal || "none"} stopped=${stopped} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
       );
       if (!stopped) removePathSoon(dir, 5 * 60 * 1000);
     });
-
-    readable.pipe(ffmpeg.stdin);
   }
 
   app.get("/api/xtream/hls/:session/:playback/index.m3u8", async (req, res) => {
