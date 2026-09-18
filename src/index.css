@@ -271,7 +271,7 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   #details-card-container {
     height: 100%;
     max-height: 100%;
-    border-radius: 20px;
+    border-radius: 1.5rem;
   }
   #details-card-container.details-series,
   #details-card-container.details-movie {
@@ -566,6 +566,14 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   align-items: center;
   justify-content: center;
 }
+.stream-card-action-visual {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.stream-card-action:hover .stream-card-action-visual {
+  background: rgba(15, 23, 42, 0.9);
+}
 .search-modal-viewport {
   max-height: inherit;
 }
@@ -727,7 +735,7 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 /* Touch: keep icon visuals compact while enlarging the interactive area. */
 @media (hover: none), (pointer: coarse) {
   .stream-card-actions {
-    opacity: 1;
+    opacity: 0.8;
     gap: 4px;
   }
   .stream-card-action {
