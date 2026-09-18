@@ -10,7 +10,6 @@ interface StreamCardProps {
   onSelect: (item: ContentItem) => void;
   onToggleFavorite: (item: ContentItem) => void;
   onToggleWatchlist?: (item: ContentItem) => void;
-  onPlayDirect?: (item: ContentItem) => void;
 }
 
 const StreamCardComponent: React.FC<StreamCardProps> = ({
@@ -21,7 +20,6 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
   onSelect,
   onToggleFavorite,
   onToggleWatchlist,
-  onPlayDirect,
 }) => {
   const [imageError, setImageError] = useState(false);
 
