@@ -8,8 +8,30 @@ type Entry<T> = {
 };
 
 const TTL_MS = 5 * 60 * 1000;
+const MAX_DETAIL_ENTRIES = 96;
 const vodCache = new Map<string, Entry<VodDetails>>();
 const seriesCache = new Map<string, Entry<SeriesDetails>>();
+
+function pruneCache<T>(cache: Map<string, Entry<T>>, now: number) {
+  if (cache.size <= MAX_DETAIL_ENTRIES) return;
+
+  for (const [key, entry] of cache) {
+    if (!entry.pending && entry.expiresAt <= now) cache.delete(key);
+  }
+
+  while (cache.size > MAX_DETAIL_ENTRIES) {
+    const oldest = cache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    const entry = cache.get(oldest);
+    if (entry?.pending) {
+      // Move active pending entries to the back instead of evicting their dedupe slot.
+      cache.delete(oldest);
+      cache.set(oldest, entry);
+      continue;
+    }
+    cache.delete(oldest);
+  }
+}
 
 function providerKey() {
   const credentials = xtreamService.getCredentials();
@@ -24,6 +46,7 @@ function guarded<T>(
   loader: () => Promise<T | null>
 ): Promise<T | null> {
   const now = Date.now();
+  pruneCache(cache, now);
   const key = `${providerKey()}::${id}`;
   const current = cache.get(key);
 
