@@ -326,7 +326,7 @@ video {
   padding-right: max(1.25rem, env(safe-area-inset-right));
 }
 #video-player button, #video-player select { min-width: 44px; min-height: 44px; }
-#video-player .seek-slider:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+#video-player .seek-slider:focus-visible { outline: 2px solid var(--ds-sky); outline-offset: 2px; }
 .modal-shell {
   width: 100vw;
   width: 100dvw;
@@ -351,7 +351,7 @@ html.modal-open body {
 .overflow-y-auto, .overflow-x-auto { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 input, textarea { user-select: text; -webkit-user-select: text; }
 button, [role=button], a { touch-action: manipulation; }
-button:focus-visible, [role=button]:focus-visible, select:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
+button:focus-visible, [role=button]:focus-visible, select:focus-visible { outline: 2px solid var(--ds-sky); outline-offset: 2px; }
 @media (any-pointer: coarse) {
   button, select, [role=button] { min-height: 44px; }
   input:not([type=checkbox]):not([type=range]), textarea, select { font-size: max(16px, 1em); }
@@ -527,10 +527,10 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     z-index: 20;
     margin-inline: -12px;
     padding: 10px 12px;
-    background: rgba(2, 6, 23, 0.96);
+    background: rgba(7, 12, 26, 0.66);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    border-bottom-color: rgba(51, 65, 85, 0.9);
+    border-bottom-color: var(--ds-glass-border);
   }
   .details-season-tabs {
     width: 100%;
@@ -939,7 +939,7 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     line-height: 1.25;
   }
   .search-result-row:hover {
-    background-color: rgb(2 6 23);
+    background-color: rgba(15, 23, 42, 0.48);
   }
   .home-portal-card:active,
   .home-recent-card:active,
@@ -1153,10 +1153,6 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   --player-edge-top: max(12px, env(safe-area-inset-top));
   --player-edge-bottom: max(12px, env(safe-area-inset-bottom));
 }
-#video-player .player-top,
-#video-player .player-bottom {
-  transition: opacity 180ms ease;
-}
 #video-player .player-seek-thumb {
   opacity: 0.9;
 }
@@ -1350,21 +1346,6 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   box-shadow: inset 0 1px 0 var(--ds-glass-highlight), 0 8px 24px rgba(0,0,0,.24);
 }
 
-/* Preserve the original TV focus signature exactly. */
-.tv-focus {
-  outline: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.tv-focus:focus,
-.tv-focus:focus-visible {
-  outline: 2px solid var(--ds-sky) !important;
-  outline-offset: 2px !important;
-  box-shadow: 0 0 25px rgba(56, 189, 248, 0.5),
-              inset 0 0 15px rgba(56, 189, 248, 0.15) !important;
-  transform: scale(var(--ds-focus-scale));
-  z-index: 10;
-}
-
 /* Fine pointers: card itself is the primary animated object. */
 @media (hover: hover) and (pointer: fine) {
   .stream-card,
@@ -1402,28 +1383,6 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     transform: scale(0.985);
     transition-duration: 120ms;
   }
-}
-
-/* Player OSD: glass controls and deterministic 300ms fade. */
-#video-player .player-top,
-#video-player .player-bottom {
-  transition: opacity var(--ds-motion-normal) var(--ds-ease-standard) !important;
-}
-#video-player .player-top button,
-#video-player .player-bottom button:not([aria-label="Play"]):not([aria-label="Pause"]),
-#video-player .player-bottom select,
-#video-player .player-episodes button {
-  background-color: var(--ds-glass-control) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
-  border-color: var(--ds-glass-border) !important;
-  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), 0 8px 22px rgba(0,0,0,.28);
-}
-#video-player .player-episodes {
-  background: rgba(7, 12, 26, .68) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(145%);
-  backdrop-filter: blur(20px) saturate(145%);
-  border-color: var(--ds-glass-border) !important;
 }
 
 /* Scrubber thumb: reveal on hover/focus for fine pointers, always visible on touch. */
@@ -1876,3 +1835,17 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
       0 0 22px rgba(56, 189, 248, .20);
   }
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Design-system maintenance contract                                         */
+/* -------------------------------------------------------------------------- */
+/*
+ * New floating/chrome UI must use semantic primitives defined at the top of
+ * this file (.glass-chrome, .glass-surface, .glass-control, .glass-modal,
+ * .glass-backdrop, .tv-focus, .interactive-card, .primary-action).
+ *
+ * Avoid introducing new opaque bg-black/bg-slate-* floating surfaces or
+ * one-off cyan glows. Strong sky/cyan is reserved for focus, active state,
+ * primary actions, and playback progress.
+ */
