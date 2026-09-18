@@ -198,18 +198,28 @@ export function useStorage() {
     }
 
     if (progress.duration > 0 && progress.timestamp / progress.duration > 0.95) {
-      commitContinueWatching((prev) => prev.filter((p) => p.id !== progress.id));
+      commitContinueWatching((prev) =>
+        prev.filter((p) => !(p.type === progress.type && String(p.id) === String(progress.id)))
+      );
       return;
     }
     if (progress.timestamp < 5) return;
 
     commitContinueWatching((prev) => {
-      const filtered = prev.filter((p) => p.id !== progress.id);
+      const filtered = prev.filter(
+        (p) => !(p.type === progress.type && String(p.id) === String(progress.id))
+      );
       return [{ ...progress, lastUpdated: Date.now() }, ...filtered].slice(0, 50);
     });
   }, [commitContinueWatching]);
 
-  const getProgress = useCallback((id: string | number) => continueWatching.find((p) => String(p.id) === String(id)) || null, [continueWatching]);
+  const getProgress = useCallback(
+    (id: string | number, type?: string) =>
+      continueWatching.find(
+        (p) => String(p.id) === String(id) && (!type || p.type === type)
+      ) || null,
+    [continueWatching]
+  );
   const removeProgress = useCallback((id: string | number) => {
     commitContinueWatching((prev) => prev.filter((p) => String(p.id) !== String(id)));
   }, [commitContinueWatching]);
