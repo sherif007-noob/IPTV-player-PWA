@@ -244,7 +244,7 @@ export default function App() {
   useEffect(() => {
     xtreamService.setRefreshListener((msg) => {
       setRefreshNotice(msg);
-      if (currentView !== 'home') {
+      if (currentView !== 'home' && !selectedCategoryId.startsWith('special_')) {
         loadViewData(currentView as MainNavView, selectedCategoryId);
       }
       setTimeout(() => setRefreshNotice(null), 5000);
@@ -256,7 +256,13 @@ export default function App() {
   // Load Content based on View & Category (on-demand loading)
   const loadViewData = useCallback(
     async (view: MainNavView, catId: string = 'all') => {
-      if (view === 'home' || view === 'favorites' || view === 'watchlist' || view === 'continue_watching') {
+      if (
+        view === 'home' ||
+        view === 'favorites' ||
+        view === 'watchlist' ||
+        view === 'continue_watching' ||
+        catId.startsWith('special_')
+      ) {
         return;
       }
 
@@ -395,12 +401,30 @@ export default function App() {
 
   // Navigation handlers
   const handleSelectView = (view: MainNavView, initialCategoryId: string = 'all') => {
+    const switchingSection = view !== currentView;
+    if (switchingSection) {
+      loadRequestIdRef.current += 1;
+      if (view !== 'vod') {
+        setMovies([]);
+        fullCatalogLoadedRef.current.vod = false;
+      }
+      if (view !== 'series') {
+        setSeries([]);
+        fullCatalogLoadedRef.current.series = false;
+      }
+      homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
+      releaseCatalogMemory();
+    }
+
     setViewHistory((prev) => (prev[prev.length - 1] === view ? prev : [...prev, view]));
     setCurrentView(view);
     if (isCompactNavigation) setIsSidebarOpen(false);
     setSelectedCategoryId(initialCategoryId);
     setHeaderSearchQuery('');
-    loadViewData(view, initialCategoryId.startsWith('special_') ? 'all' : initialCategoryId);
+
+    if (!initialCategoryId.startsWith('special_')) {
+      loadViewData(view, initialCategoryId);
+    }
   };
 
   const handleNavigateHome = () => {
@@ -445,6 +469,7 @@ export default function App() {
         setSeries([]);
         fullCatalogLoadedRef.current.series = false;
       }
+      releaseCatalogMemory();
       return;
     }
 
