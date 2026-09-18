@@ -110,6 +110,8 @@ export default function App() {
   const [movies, setMovies] = useState<VodMovie[]>([]);
   const [series, setSeries] = useState<SeriesItem[]>([]);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const fullCatalogLoadedRef = useRef({ vod: false, series: false });
+  const homeSearchOwnedCatalogsRef = useRef({ vod: false, series: false });
 
   const [isCompactNavigation, setIsCompactNavigation] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -279,6 +281,7 @@ export default function App() {
             .then(setCategories)
             .catch((error) => console.warn('VOD category refresh notice:', error));
           const vodList = await xtreamService.getVodStreams(catId);
+          if (catId === 'all') fullCatalogLoadedRef.current.vod = true;
           setMovies(vodList);
           setIsLoadingContent(false);
           await categoriesPromise;
@@ -287,6 +290,7 @@ export default function App() {
             .then(setCategories)
             .catch((error) => console.warn('Series category refresh notice:', error));
           const sList = await xtreamService.getSeries(catId);
+          if (catId === 'all') fullCatalogLoadedRef.current.series = true;
           setSeries(sList);
           setIsLoadingContent(false);
           await categoriesPromise;
@@ -326,8 +330,14 @@ export default function App() {
         // Do not preload the huge VOD/Series catalogs on startup. They are restored
         // from IndexedDB or fetched only when the user opens that section.
         if (currentView !== 'home') {
-          const restoredCategory = selectedCategoryId.startsWith('special_') ? 'all' : selectedCategoryId;
-          await loadViewData(currentView as MainNavView, restoredCategory);
+          if (selectedCategoryId.startsWith('special_')) {
+            if (currentView === 'live' || currentView === 'vod' || currentView === 'series') {
+              const restoredCategories = await xtreamService.getCategories(currentView);
+              setCategories(restoredCategories);
+            }
+          } else {
+            await loadViewData(currentView as MainNavView, selectedCategoryId);
+          }
         }
       } catch (err) {
         console.warn('Initial authentication attempt:', err);
@@ -409,13 +419,8 @@ export default function App() {
   const handleSelectCategory = (catId: string) => {
     setSelectedCategoryId(catId);
     if (isCompactNavigation) setIsSidebarOpen(false);
-    if (currentView !== 'home') {
-      if (catId.startsWith('special_')) {
-        // Ensure section content is loaded
-        loadViewData(currentView as MainNavView, 'all');
-      } else {
-        loadViewData(currentView as MainNavView, catId);
-      }
+    if (currentView !== 'home' && !catId.startsWith('special_')) {
+      loadViewData(currentView as MainNavView, catId);
     }
   };
 
@@ -425,12 +430,21 @@ export default function App() {
     setRefreshNotice('Refreshing credentials & Xtream playlists...');
     try {
       xtreamService.clearCache();
+      fullCatalogLoadedRef.current = { vod: false, series: false };
+      homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
       await invalidatePersistentCatalogs();
       await xtreamService.authenticate();
       setUserInfo(xtreamService.getUserInfo());
       setServerInfo(xtreamService.getServerInfo());
       if (currentView !== 'home') {
-        await loadViewData(currentView as MainNavView, selectedCategoryId);
+        if (selectedCategoryId.startsWith('special_')) {
+          if (currentView === 'live' || currentView === 'vod' || currentView === 'series') {
+            const refreshedCategories = await xtreamService.getCategories(currentView);
+            setCategories(refreshedCategories);
+          }
+        } else {
+          await loadViewData(currentView as MainNavView, selectedCategoryId);
+        }
       } else {
         await Promise.allSettled([
           xtreamService.getCategories('live'),
@@ -446,6 +460,69 @@ export default function App() {
       setTimeout(() => setRefreshNotice(null), 4000);
     }
   };
+
+  const isHomeSearchActive =
+    currentView === 'home' && headerSearchQuery.trim().length > 0;
+
+  useEffect(() => {
+    if (!isHomeSearchActive) {
+      if (currentView === 'home') {
+        if (homeSearchOwnedCatalogsRef.current.vod) {
+          setMovies([]);
+          fullCatalogLoadedRef.current.vod = false;
+        }
+        if (homeSearchOwnedCatalogsRef.current.series) {
+          setSeries([]);
+          fullCatalogLoadedRef.current.series = false;
+        }
+        homeSearchOwnedCatalogsRef.current = { vod: false, series: false };
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const loadMissingSearchCatalogs = async () => {
+      const tasks: Promise<void>[] = [];
+      setRefreshNotice('Loading full library search...');
+
+      if (!fullCatalogLoadedRef.current.vod) {
+        const owned = movies.length === 0;
+        tasks.push(
+          xtreamService.getVodStreams('all').then((vodList) => {
+            if (cancelled) return;
+            setMovies(vodList);
+            fullCatalogLoadedRef.current.vod = true;
+            if (owned) homeSearchOwnedCatalogsRef.current.vod = true;
+          })
+        );
+      }
+
+      if (!fullCatalogLoadedRef.current.series) {
+        const owned = series.length === 0;
+        tasks.push(
+          xtreamService.getSeries('all').then((seriesList) => {
+            if (cancelled) return;
+            setSeries(seriesList);
+            fullCatalogLoadedRef.current.series = true;
+            if (owned) homeSearchOwnedCatalogsRef.current.series = true;
+          })
+        );
+      }
+
+      if (!tasks.length) {
+        setRefreshNotice(null);
+        return;
+      }
+
+      await Promise.allSettled(tasks);
+      if (!cancelled) setRefreshNotice(null);
+    };
+
+    void loadMissingSearchCatalogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [isHomeSearchActive, currentView]);
 
   // Playback Starter
   const handleStartPlay = (
@@ -761,7 +838,34 @@ export default function App() {
   const currentGridItems = useMemo<ContentItem[]>(() => {
     let items: ContentItem[] = [];
 
-    if (currentView === 'live') {
+    const progressItems = storage.continueWatching.map((p) => ({
+      id: p.type === 'series' ? (p.seriesId || p.id) : p.id,
+      type: p.type,
+      name: p.title,
+      category_id: 'continue',
+      icon: p.poster,
+      seriesId: p.seriesId,
+    } as ContentItem));
+
+    if (selectedCategoryId === 'special_favorites') {
+      items = storage.favorites.filter((item) =>
+        currentView === 'live' || currentView === 'vod' || currentView === 'series'
+          ? item.type === currentView
+          : true
+      );
+    } else if (selectedCategoryId === 'special_watchlist') {
+      items = storage.watchlist.filter((item) =>
+        currentView === 'vod' || currentView === 'series'
+          ? item.type === currentView
+          : true
+      );
+    } else if (selectedCategoryId === 'special_continue') {
+      items = progressItems.filter((item) =>
+        currentView === 'live' || currentView === 'vod' || currentView === 'series'
+          ? item.type === currentView
+          : true
+      );
+    } else if (currentView === 'live') {
       items = liveContentItems;
     } else if (currentView === 'vod') {
       items = movieContentItems;
@@ -772,31 +876,10 @@ export default function App() {
     } else if (currentView === 'watchlist') {
       items = storage.watchlist;
     } else if (currentView === 'continue_watching') {
-      items = storage.continueWatching.map((p) => ({
-        id: p.id,
-        type: p.type,
-        name: p.title,
-        category_id: 'continue',
-        icon: p.poster,
-        seriesId: p.seriesId,
-      }));
+      items = progressItems;
     }
 
-    // Filter by Special Categories (Favorites, Continue Watching, Watchlist) or Server Category
-    if (selectedCategoryId === 'special_favorites') {
-      items = items.filter((item) => storage.isFavorite(item.id, item.type));
-    } else if (selectedCategoryId === 'special_continue') {
-      items = items.filter((item) => {
-        return storage.continueWatching.some((p) => {
-          if (item.type === 'series') {
-            return p.seriesId === Number(item.id) || String(p.id) === String(item.id);
-          }
-          return String(p.id) === String(item.id) && p.type === item.type;
-        });
-      });
-    } else if (selectedCategoryId === 'special_watchlist') {
-      items = items.filter((item) => storage.isInWatchlist(item.id, item.type));
-    } else if (selectedCategoryId !== 'all' && !selectedCategoryId.startsWith('special_')) {
+    if (selectedCategoryId !== 'all' && !selectedCategoryId.startsWith('special_')) {
       items = items.filter((item) => item.category_id === selectedCategoryId);
     }
 
