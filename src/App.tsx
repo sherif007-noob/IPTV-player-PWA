@@ -140,6 +140,69 @@ export default function App() {
   // Search state (Header searchbar)
   const [headerSearchQuery, setHeaderSearchQuery] = useState<string>('');
 
+  // Scroll-aware overlay header. TV/webOS keeps the header permanently visible;
+  // touch/mouse browsers hide it on meaningful downward scroll and reveal it on upward scroll.
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+  const headerScrollStateRef = useRef({ lastTop: 0, direction: 0, accumulated: 0 });
+
+  const revealHeader = useCallback(() => {
+    setIsHeaderHidden(false);
+    headerScrollStateRef.current.accumulated = 0;
+  }, []);
+
+  const handleHeaderScrollPosition = useCallback((scrollTop: number) => {
+    if (isWebOSRuntime) {
+      setIsHeaderHidden(false);
+      return;
+    }
+
+    const state = headerScrollStateRef.current;
+    const header = document.getElementById('app-top-header');
+    const activeElement = document.activeElement;
+    const headerHasFocus = !!(header && activeElement && header.contains(activeElement));
+    const mustStayVisible =
+      scrollTop <= 12 ||
+      headerHasFocus ||
+      (isCompactNavigation && isSidebarOpen);
+
+    if (mustStayVisible) {
+      setIsHeaderHidden(false);
+      state.lastTop = scrollTop;
+      state.accumulated = 0;
+      state.direction = 0;
+      return;
+    }
+
+    const delta = scrollTop - state.lastTop;
+    state.lastTop = scrollTop;
+    if (Math.abs(delta) < 2) return;
+
+    const direction = delta > 0 ? 1 : -1;
+    if (direction !== state.direction) {
+      state.direction = direction;
+      state.accumulated = 0;
+    }
+    state.accumulated += Math.abs(delta);
+
+    if (direction > 0 && scrollTop > 48 && state.accumulated >= 18) {
+      setIsHeaderHidden(true);
+      state.accumulated = 0;
+    } else if (direction < 0 && state.accumulated >= 12) {
+      setIsHeaderHidden(false);
+      state.accumulated = 0;
+    }
+  }, [isCompactNavigation, isSidebarOpen, isWebOSRuntime]);
+
+  useEffect(() => {
+    revealHeader();
+    headerScrollStateRef.current.lastTop = 0;
+    headerScrollStateRef.current.direction = 0;
+  }, [currentView, revealHeader]);
+
+  useEffect(() => {
+    if (isCompactNavigation && isSidebarOpen) revealHeader();
+  }, [isCompactNavigation, isSidebarOpen, revealHeader]);
+
   useEffect(() => {
     if (isCompactNavigation && headerSearchQuery.trim()) {
       setIsSidebarOpen(false);
@@ -787,6 +850,7 @@ export default function App() {
 
   const handleGridScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    handleHeaderScrollPosition(scrollTop);
     if (scrollHeight - scrollTop - clientHeight < 600 && visibleCount < currentGridItems.length) {
       setVisibleCount((prev) => Math.min(prev + 48, currentGridItems.length));
     }
@@ -868,7 +932,8 @@ export default function App() {
   return (
     <div
       id="webos-iptv-root"
-      className="flex flex-col h-full w-full bg-[#0b0e14] text-slate-100 overflow-hidden font-sans select-none"
+      data-header-hidden={isHeaderHidden ? 'true' : 'false'}
+      className="relative flex flex-col h-full w-full bg-[#0b0e14] text-slate-100 overflow-hidden font-sans select-none"
     >
       {/* 1. Universal Top Header with Searchbar, Home button, Refresh & Settings */}
       <AppHeader
@@ -886,6 +951,8 @@ export default function App() {
         onSelectFontSize={storage.setTvFontSize}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={handleToggleSidebar}
+        isHidden={isHeaderHidden}
+        onRequestReveal={revealHeader}
       />
 
       {/* 2. Main Body Area */}
@@ -900,6 +967,7 @@ export default function App() {
             continueWatchingList={storage.continueWatching}
             onResumeRecent={handleResumeProgress}
             onClearContinueWatching={() => storage.clearContinueWatching()}
+            onScrollPositionChange={handleHeaderScrollPosition}
           />
         ) : (
           <>
@@ -983,10 +1051,15 @@ export default function App() {
               </>
             )}
 
-            {/* Content Stage Grid */}
-            <main className="library-content-stage min-w-0 min-h-0 flex-1 flex flex-col overflow-hidden bg-gradient-to-br from-slate-950 via-[#0b0e14] to-slate-950">
-              {/* Section Subheader / Breadcrumb */}
-              <div className="library-subheader min-h-12 flex-wrap gap-2 py-2 px-3 sm:px-6 border-b border-slate-850 flex items-center justify-between shrink-0 bg-slate-950/40">
+            {/* Content Stage: one scroll plane so content can pass behind the frosted header. */}
+            <main className="library-content-stage min-w-0 min-h-0 flex-1 overflow-hidden bg-gradient-to-br from-slate-950 via-[#0b0e14] to-slate-950">
+              <div
+                id="main-scrollable-content-grid"
+                onScroll={handleGridScroll}
+                className="library-scroll-stage h-full overflow-y-auto"
+              >
+                {/* Section Subheader / Breadcrumb */}
+                <div className="library-subheader min-h-12 flex-wrap gap-2 py-2 px-3 sm:px-6 border-b border-slate-850 flex items-center justify-between bg-slate-950/40">
                 <div className="library-breadcrumb flex items-center gap-2 text-xs">
                   <button
                     onClick={handleNavigateHome}
@@ -1083,12 +1156,8 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Scrollable Grid of Content Cards */}
-              <div
-                id="main-scrollable-content-grid"
-                onScroll={handleGridScroll}
-                className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6"
-              >
+                {/* Content cards inside the same scroll plane. */}
+                <div className="library-grid-content min-h-full p-3 sm:p-4 lg:p-6">
                 {isLoadingContent ? (
                   <div className="h-full flex flex-col items-center justify-center text-slate-400 gap-3 py-16">
                     <RefreshCw className="w-9 h-9 text-sky-400 animate-spin" />
@@ -1187,6 +1256,7 @@ export default function App() {
                     )}
                   </>
                 )}
+                </div>
               </div>
             </main>
           </>
