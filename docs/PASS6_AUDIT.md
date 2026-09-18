@@ -142,3 +142,22 @@ Use `UX_QA_CHECKLIST.md` as the final gate.
 - Add true list virtualization for extremely large rendered catalogs if chunked rendering becomes insufficient.
 - Add a provider-backed search endpoint only if the target Xtream servers expose a reliable search capability; otherwise retain lazy local full-catalog search.
 - Add automated browser interaction tests for header scroll direction, sidebar backdrop gestures, dialog focus stack, and player OSD timer semantics.
+
+
+## Final Pass 6 hardening addendum
+
+The final audit round added these additional protections after the initial report was written:
+
+- Provider/catalog requests now use a request-generation guard so a late response from Movies/Series/category A cannot overwrite a newer active section/category.
+- `special_*` synthetic categories are explicitly blocked at the generic provider-loading boundary and in automated refresh handling.
+- Switching sections releases the inactive VOD/Series catalog memory while IndexedDB remains intact.
+- Catalog memory release increments a memory generation; a network request that started before the release may still persist its result to IndexedDB, but it cannot repopulate the released hot cache and its wrapped service cache is cleared on completion.
+- Category-first loading no longer deserializes a persistent full `all` catalog merely to serve one missing category. Persistent exact-category cache is preferred; otherwise the provider category endpoint is used. A full catalog is filtered only when it is already hot in memory.
+- Home scroll is now stored/restored through the same lightweight scroll-key system as library/category views.
+- Navigation/category transitions save the outgoing scroll surface before changing state.
+- Completed Home global-search catalogs are released from service/hot memory when search is cleared.
+- VOD/Series catalog counts are persisted separately as tiny provider-scoped metadata (`iptv_catalog_counts_v1`) so the Home dashboard keeps accurate last-known counts after heavy arrays are released or Safari reloads.
+- The header icon-only CSS breakpoint now ends at 639px to align with Tailwind's `sm` label breakpoint; the active Home icon contrast and clear-search centering were also corrected.
+- Duplicate Home/Stream card transform rules and explicit poster zoom classes were removed so `.interactive-card` is the sole owner of card lift/press/poster zoom behavior.
+
+These additions are included in the current `UX_QA_CHECKLIST.md` regression gate.
