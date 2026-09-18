@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Download, Share, PlusSquare, X, CheckCircle2, Smartphone } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import { ModalShell } from './ModalShell';
 
 interface PWAInstallButtonProps {
   variant?: 'header' | 'settings' | 'banner';
@@ -36,6 +37,79 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
     }
   };
 
+  const iosGuide = (
+    <ModalShell
+      open={showIOSGuide}
+      onClose={() => setShowIOSGuide(false)}
+      overlayId="ios-pwa-install-modal"
+      cardId="ios-pwa-install-card"
+      ariaLabel="Install on iPhone or iPad"
+      overlayClassName="z-50 bg-black/80 backdrop-blur-md p-4"
+      cardClassName="w-full max-w-sm bg-slate-900 border border-slate-700/80 rounded-2xl p-6 shadow-2xl space-y-4 text-left relative overflow-y-auto"
+    >
+      <button
+        onClick={() => setShowIOSGuide(false)}
+        aria-label="Close install instructions"
+        className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
+      >
+        <X className="w-4 h-4" />
+      </button>
+
+      <div className="flex items-center gap-3 pb-2 pr-8 border-b border-slate-800">
+        <div className="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shrink-0">
+          <Smartphone className="w-5 h-5" />
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-base font-bold text-white">Install on iPhone / iPad</h3>
+          <p className="text-xs text-slate-400">Add to your Home Screen</p>
+        </div>
+      </div>
+
+      <div className="space-y-3 text-xs text-slate-300">
+        <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+          <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">1</div>
+          <div>
+            <p className="font-semibold text-white flex items-center gap-1.5">
+              Tap the <Share className="w-3.5 h-3.5 text-sky-400 inline" /> Share button
+            </p>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              Found in Safari's bottom toolbar on iPhone or top toolbar on iPad.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+          <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">2</div>
+          <div>
+            <p className="font-semibold text-white flex items-center gap-1.5">
+              Tap <PlusSquare className="w-3.5 h-3.5 text-sky-400 inline" /> "Add to Home Screen"
+            </p>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              Scroll through the share sheet and choose Add to Home Screen.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
+          <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">3</div>
+          <div>
+            <p className="font-semibold text-white">Tap "Add" in the top right</p>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              The IPTV Player will then launch from your Home Screen as a standalone app.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={() => setShowIOSGuide(false)}
+        className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold shadow-md shadow-sky-500/30 transition-colors"
+      >
+        Got It
+      </button>
+    </ModalShell>
+  );
+
   // Header compact button
   if (variant === 'header') {
     if (!isInstallable && !isIOS) {
@@ -55,85 +129,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
           <span className="hidden sm:inline">{isIOS ? 'Install PWA' : 'Install App'}</span>
         </button>
 
-        {/* iOS Safari Installation Guide Modal */}
-        {showIOSGuide && (
-          <div
-            id="ios-pwa-install-modal"
-            className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
-            onClick={() => setShowIOSGuide(false)}
-          >
-            <div
-              className="w-full max-w-sm bg-slate-900 border border-slate-700/80 rounded-2xl p-6 shadow-2xl space-y-4 text-left relative"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={() => setShowIOSGuide(false)}
-                className="absolute top-4 right-4 text-slate-400 hover:text-white p-1"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-              <div className="flex items-center gap-3 pb-2 border-b border-slate-800">
-                <div className="w-10 h-10 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400">
-                  <Smartphone className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">Install on iPhone / iPad</h3>
-                  <p className="text-xs text-slate-400">Add to your Home Screen</p>
-                </div>
-              </div>
-
-              <div className="space-y-3 text-xs text-slate-300">
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
-                  <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">
-                    1
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white flex items-center gap-1.5">
-                      Tap the <Share className="w-3.5 h-3.5 text-sky-400 inline" /> Share button
-                    </p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">
-                      Found in Safari's bottom toolbar (iPhone) or top toolbar (iPad).
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
-                  <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">
-                    2
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white flex items-center gap-1.5">
-                      Tap <PlusSquare className="w-3.5 h-3.5 text-sky-400 inline" /> "Add to Home Screen"
-                    </p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">
-                      Scroll down the share sheet menu and select Add to Home Screen.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950/70 border border-white/5">
-                  <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 font-bold font-mono text-xs">
-                    3
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">Tap "Add" in the top right</p>
-                    <p className="text-slate-400 text-[11px] mt-0.5">
-                      The IPTV Player will launch fullscreen with native performance.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowIOSGuide(false)}
-                className="w-full py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white text-xs font-bold shadow-md shadow-sky-500/30 transition-colors"
-              >
-                Got It
-              </button>
-            </div>
-          </div>
-        )}
+        {iosGuide}
       </>
     );
   }
@@ -163,31 +159,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
         <span>{isIOS ? 'Show iOS Install Instructions' : 'Install PWA to Device'}</span>
       </button>
 
-      {/* iOS Modal if opened from settings */}
-      {showIOSGuide && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
-          onClick={() => setShowIOSGuide(false)}
-        >
-          <div
-            className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4 text-left"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-base font-bold text-white">Install on iPhone / iPad</h3>
-            <p className="text-xs text-slate-300">
-              1. Tap Safari's <strong>Share</strong> button.<br />
-              2. Choose <strong>Add to Home Screen</strong>.<br />
-              3. Tap <strong>Add</strong> in the top right.
-            </p>
-            <button
-              onClick={() => setShowIOSGuide(false)}
-              className="w-full py-2 rounded-xl bg-sky-500 text-white text-xs font-bold"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {iosGuide}
     </div>
   );
 };
