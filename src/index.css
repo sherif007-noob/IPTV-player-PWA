@@ -1745,3 +1745,109 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     padding-bottom: 8px;
   }
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Pass 4: app-wide semantic surface migration                                */
+/* -------------------------------------------------------------------------- */
+
+#category-sidebar-panel,
+.details-modal-card,
+.search-modal-card,
+.settings-modal-card,
+.pwa-install-card,
+.exit-confirm-card {
+  color: var(--ds-text-secondary);
+}
+
+#category-sidebar-panel {
+  background: rgba(7, 12, 26, 0.60) !important;
+}
+
+.details-modal-card,
+.search-modal-card,
+.settings-modal-card,
+.pwa-install-card,
+.exit-confirm-card {
+  background: var(--ds-glass-modal) !important;
+  -webkit-backdrop-filter: blur(var(--ds-blur-modal)) saturate(var(--ds-saturate-glass));
+  backdrop-filter: blur(var(--ds-blur-modal)) saturate(var(--ds-saturate-glass));
+  border: 1px solid var(--ds-glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), var(--ds-shadow-modal) !important;
+}
+
+.details-glass-section,
+.search-glass-strip,
+.settings-status-strip {
+  background: rgba(15, 23, 42, 0.46) !important;
+  -webkit-backdrop-filter: blur(var(--ds-blur-panel)) saturate(140%);
+  backdrop-filter: blur(var(--ds-blur-panel)) saturate(140%);
+}
+
+.details-glass-body {
+  background: rgba(2, 6, 23, 0.36) !important;
+}
+
+.search-modal-results,
+.settings-modal-card form {
+  background: transparent;
+}
+
+.search-result-row,
+.details-episode-card,
+.settings-field {
+  border-color: var(--ds-glass-border) !important;
+}
+
+.search-result-row {
+  background: rgba(15, 23, 42, 0.48) !important;
+  transition:
+    transform var(--ds-motion-fast) var(--ds-ease-premium),
+    border-color var(--ds-motion-fast) ease-out,
+    background-color var(--ds-motion-fast) ease-out,
+    box-shadow var(--ds-motion-fast) ease-out;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .search-result-row:hover {
+    background: rgba(30, 41, 59, 0.62) !important;
+    box-shadow: var(--ds-glow-sky-soft);
+    transform: translateY(-1px);
+  }
+}
+
+.details-episode-card {
+  background: rgba(15, 23, 42, 0.48) !important;
+}
+
+.details-episode-card:hover,
+.details-episode-card:focus-visible {
+  border-color: rgba(56, 189, 248, 0.42) !important;
+}
+
+.settings-field {
+  background: rgba(2, 6, 23, 0.46) !important;
+  -webkit-backdrop-filter: blur(10px) saturate(125%);
+  backdrop-filter: blur(10px) saturate(125%);
+}
+
+.settings-field:focus {
+  border-color: var(--ds-sky) !important;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.18);
+}
+
+.stream-card-action-visual {
+  background: var(--ds-glass-control) !important;
+  -webkit-backdrop-filter: blur(var(--ds-blur-control)) saturate(140%);
+  backdrop-filter: blur(var(--ds-blur-control)) saturate(140%);
+  border: 1px solid var(--ds-glass-border) !important;
+  box-shadow: inset 0 1px 0 var(--ds-glass-highlight), var(--ds-shadow-control);
+}
+
+#exit-confirm-card #btn-exit-confirm {
+  box-shadow: 0 10px 28px rgba(220, 38, 38, 0.22);
+}
+
+#btn-load-more-titles {
+  background: var(--ds-glass-control) !important;
+}
