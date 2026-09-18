@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { PlaybackProgress, ContentItem, WatchedEpisodeRecord, TvFontSize } from '../types';
 
 const FAVORITES_KEY = 'webos_xtream_favorites';
@@ -220,8 +220,12 @@ export function useStorage() {
       ) || null,
     [continueWatching]
   );
-  const removeProgress = useCallback((id: string | number) => {
-    commitContinueWatching((prev) => prev.filter((p) => String(p.id) !== String(id)));
+  const removeProgress = useCallback((id: string | number, type?: string) => {
+    commitContinueWatching((prev) =>
+      prev.filter(
+        (p) => !(String(p.id) === String(id) && (!type || p.type === type))
+      )
+    );
   }, [commitContinueWatching]);
 
   const makeEpisodeKey = (seriesId: number, seasonNum: number, episodeNum: number) => `${seriesId}_s${seasonNum}_e${episodeNum}`;
