@@ -46,6 +46,19 @@ import { ModalShell } from './components/ModalShell';
 
 export default function App() {
   const storage = useStorage();
+  const isWebOSRuntime = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return !!(window as any).webOS || /web0s|webos/i.test(navigator.userAgent);
+  }, []);
+  const isStandalonePwa = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return window.matchMedia?.('(display-mode: standalone)').matches ||
+      !!(navigator as any).standalone;
+  }, []);
+  const showRemoteHud = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return isWebOSRuntime || new URLSearchParams(window.location.search).get('remoteHud') === '1';
+  }, [isWebOSRuntime]);
 
   // Navigation state: 'home' is the default starting page
   const [currentView, setCurrentView] = useState<MainNavView | 'home'>('home');
@@ -59,22 +72,25 @@ export default function App() {
   const [series, setSeries] = useState<SeriesItem[]>([]);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
 
-  // Sidebar visibility state: defaults to false on mobile screens (< 768px), true on desktop/TV
+  const [isCompactNavigation, setIsCompactNavigation] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768;
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth >= 768;
-    }
-    return true;
+    if (typeof window === 'undefined') return true;
+    return window.innerWidth >= 768;
   });
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsSidebarOpen(true);
-      }
+    const media = window.matchMedia('(max-width: 767px)');
+    const syncNavigationMode = () => {
+      const compact = media.matches;
+      setIsCompactNavigation(compact);
+      setIsSidebarOpen(!compact);
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    syncNavigationMode();
+    media.addEventListener?.('change', syncNavigationMode);
+    return () => media.removeEventListener?.('change', syncNavigationMode);
   }, []);
 
   // Search state (Header searchbar)
@@ -209,16 +225,18 @@ export default function App() {
 
   // Navigation handlers
   const handleSelectView = (view: MainNavView, initialCategoryId: string = 'all') => {
-    setViewHistory((prev) => [...prev, view]);
+    setViewHistory((prev) => (prev[prev.length - 1] === view ? prev : [...prev, view]));
     setCurrentView(view);
+    if (isCompactNavigation) setIsSidebarOpen(false);
     setSelectedCategoryId(initialCategoryId);
     setHeaderSearchQuery('');
     loadViewData(view, initialCategoryId.startsWith('special_') ? 'all' : initialCategoryId);
   };
 
   const handleNavigateHome = () => {
-    setViewHistory((prev) => [...prev, 'home']);
+    setViewHistory((prev) => (prev[prev.length - 1] === 'home' ? prev : [...prev, 'home']));
     setCurrentView('home');
+    if (isCompactNavigation) setIsSidebarOpen(false);
     setSelectedCategoryId('all');
     setHeaderSearchQuery('');
   };
@@ -227,18 +245,18 @@ export default function App() {
   const handleToggleSidebar = () => {
     if (currentView === 'home') {
       handleSelectView('live');
-      setIsSidebarOpen(true);
-    } else {
-      setIsSidebarOpen((prev) => !prev);
+      if (isCompactNavigation) {
+        window.setTimeout(() => setIsSidebarOpen(true), 0);
+      }
+      return;
     }
+    setIsSidebarOpen((prev) => !prev);
   };
 
   // Category Selection
   const handleSelectCategory = (catId: string) => {
     setSelectedCategoryId(catId);
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      setIsSidebarOpen(false);
-    }
+    if (isCompactNavigation) setIsSidebarOpen(false);
     if (currentView !== 'home') {
       if (catId.startsWith('special_')) {
         // Ensure section content is loaded
@@ -365,13 +383,19 @@ export default function App() {
       return;
     }
 
-    // 4. Clear search query if active
+    // 4. Close the compact category drawer before changing navigation state
+    if (isCompactNavigation && isSidebarOpen) {
+      setIsSidebarOpen(false);
+      return;
+    }
+
+    // 5. Clear search query if active
     if (headerSearchQuery.trim()) {
       setHeaderSearchQuery('');
       return;
     }
 
-    // 5. Reset category filter to 'all' if filtered
+    // 6. Reset category filter to 'all' if filtered
     if (selectedCategoryId !== 'all') {
       setSelectedCategoryId('all');
       if (currentView !== 'home') {
@@ -380,13 +404,13 @@ export default function App() {
       return;
     }
 
-    // 6. Return to Home starting portal if inside a section
+    // 7. Return to Home starting portal if inside a section
     if (currentView !== 'home') {
       setCurrentView('home');
       return;
     }
 
-    // 7. Pop view history
+    // 8. Pop view history
     if (viewHistory.length > 1) {
       const newHistory = [...viewHistory];
       newHistory.pop();
@@ -396,7 +420,7 @@ export default function App() {
       return;
     }
 
-    // 8. If at root Home view with nothing left to back out of:
+    // 9. If at root Home view with nothing left to back out of:
     // Support double-click back to exit directly, or show confirmation dialog
     const now = Date.now();
     if (now - lastBackPressTimeRef.current < 2500) {
@@ -410,6 +434,8 @@ export default function App() {
     activePlayer,
     selectedDetailsItem,
     isSettingsOpen,
+    isCompactNavigation,
+    isSidebarOpen,
     headerSearchQuery,
     selectedCategoryId,
     currentView,
@@ -418,19 +444,22 @@ export default function App() {
     handleExitApp,
   ]);
 
-  // Defensive history state fallback for webOS platforms that dispatch popstate
+  // Trap platform-back only in webOS / installed PWA mode.
+  // Normal Safari/desktop browser history remains native instead of being permanently re-pushed.
   useEffect(() => {
+    if (!isWebOSRuntime && !isStandalonePwa) return;
     try {
-      window.history.pushState({ app: 'webos_iptv' }, '');
-      const handlePopState = (e: PopStateEvent) => {
-        e.preventDefault();
+      window.history.replaceState({ app: 'iptv_root' }, '');
+      window.history.pushState({ app: 'iptv_guard' }, '');
+      const handlePopState = (event: PopStateEvent) => {
+        event.preventDefault();
         handleBackNavigation();
-        window.history.pushState({ app: 'webos_iptv' }, '');
+        window.history.pushState({ app: 'iptv_guard' }, '');
       };
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
     } catch {}
-  }, [handleBackNavigation]);
+  }, [handleBackNavigation, isStandalonePwa, isWebOSRuntime]);
 
   // Resume in-progress titles from HomePortal Jump Back In
   const handleResumeProgress = useCallback(
@@ -767,13 +796,17 @@ export default function App() {
                   <div
                     id="sidebar-mobile-backdrop"
                     className="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 md:hidden"
-                    onClick={() => setIsSidebarOpen(false)}
+                    aria-hidden="true"
+                    onPointerDown={() => setIsSidebarOpen(false)}
                   />
                 )}
 
                 {/* Sidebar Drawer Container */}
                 <div
                   id="category-sidebar-wrapper"
+                  role={isCompactNavigation ? 'dialog' : undefined}
+                  aria-modal={isCompactNavigation ? 'true' : undefined}
+                  aria-label={isCompactNavigation ? 'Categories' : undefined}
                   className={`
                     fixed inset-y-0 left-0 top-0 z-40 md:static md:top-auto md:z-auto
                     h-[100dvh] md:h-full transition-transform duration-300 ease-in-out
@@ -1099,14 +1132,16 @@ export default function App() {
       />
 
       {/* 6. Magic Remote HUD Helper */}
-      <RemoteControlHUD
-        onBack={handleBackNavigation}
-        onSearch={() => {
-          const input = document.getElementById('header-search-input');
-          input?.focus();
-        }}
-        isPlayerOpen={!!activePlayer}
-      />
+      {showRemoteHud && (
+        <RemoteControlHUD
+          onBack={handleBackNavigation}
+          onSearch={() => {
+            const input = document.getElementById('header-search-input');
+            input?.focus();
+          }}
+          isPlayerOpen={!!activePlayer}
+        />
+      )}
 
       {/* 7. PWA Offline Toast */}
       <OfflineIndicator />
