@@ -7,6 +7,7 @@ const TTL_MS = 6 * 60 * 60 * 1000;
 const inFlight = new Map<string, Promise<any[]>>();
 const hotCatalogs = new Map<string, { updatedAt: number; data: any[] }>();
 let memoryGeneration = 0;
+let persistenceGeneration = 0;
 
 function hotKey(provider: string, kind: 'vod' | 'series', categoryId: string) {
   return `${provider}::${kind}::${categoryId}`;
@@ -40,13 +41,16 @@ async function persistRealCatalog<T>(
   kind: 'vod' | 'series',
   categoryId: string,
   data: T[],
-  requestGeneration: number
+  requestGeneration: number,
+  requestPersistenceGeneration: number
 ) {
   if (!data.length || xtreamService.getIsDemo() || matchesMockCatalog(kind, data as any[])) return;
   if (requestGeneration === memoryGeneration) {
     rememberHot(provider, kind, categoryId, data);
   }
-  await writeCatalog(provider, kind, categoryId, data);
+  if (requestPersistenceGeneration === persistenceGeneration) {
+    await writeCatalog(provider, kind, categoryId, data);
+  }
   if (requestGeneration !== memoryGeneration) {
     xtreamService.clearCache();
   }
@@ -124,10 +128,11 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
       // actually reaches the provider instead of recycling an old in-memory array.
       xtreamService.clearCache();
       const requestGeneration = memoryGeneration;
+      const requestPersistenceGeneration = persistenceGeneration;
       void deduped(
         `${provider}:vod:${key}`,
         () => originalVod(key),
-        (data) => persistRealCatalog(provider, 'vod', key, data, requestGeneration)
+        (data) => persistRealCatalog(provider, 'vod', key, data, requestGeneration, requestPersistenceGeneration)
       ).catch((error) => console.warn('Background VOD refresh notice:', error));
     }
     return exact.data;
@@ -141,10 +146,11 @@ xtreamService.getVodStreams = async (categoryId: string = 'all'): Promise<VodMov
   if (filtered?.length) return filtered;
 
   const requestGeneration = memoryGeneration;
+  const requestPersistenceGeneration = persistenceGeneration;
   const data = await deduped(
     `${provider}:vod:${key}`,
     () => originalVod(key),
-    (result) => persistRealCatalog(provider, 'vod', key, result, requestGeneration)
+    (result) => persistRealCatalog(provider, 'vod', key, result, requestGeneration, requestPersistenceGeneration)
   );
   if (!xtreamService.getIsDemo() && matchesMockCatalog('vod', data)) {
     throw new Error('VOD provider request failed; demo fallback was rejected.');
@@ -168,10 +174,11 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
     if (Date.now() - exact.updatedAt > TTL_MS) {
       xtreamService.clearCache();
       const requestGeneration = memoryGeneration;
+      const requestPersistenceGeneration = persistenceGeneration;
       void deduped(
         `${provider}:series:${key}`,
         () => originalSeries(key),
-        (data) => persistRealCatalog(provider, 'series', key, data, requestGeneration)
+        (data) => persistRealCatalog(provider, 'series', key, data, requestGeneration, requestPersistenceGeneration)
       ).catch((error) => console.warn('Background Series refresh notice:', error));
     }
     return exact.data;
@@ -185,10 +192,11 @@ xtreamService.getSeries = async (categoryId: string = 'all'): Promise<SeriesItem
   if (filtered?.length) return filtered;
 
   const requestGeneration = memoryGeneration;
+  const requestPersistenceGeneration = persistenceGeneration;
   const data = await deduped(
     `${provider}:series:${key}`,
     () => originalSeries(key),
-    (result) => persistRealCatalog(provider, 'series', key, result, requestGeneration)
+    (result) => persistRealCatalog(provider, 'series', key, result, requestGeneration, requestPersistenceGeneration)
   );
   if (!xtreamService.getIsDemo() && matchesMockCatalog('series', data)) {
     throw new Error('Series provider request failed; demo fallback was rejected.');
@@ -203,6 +211,7 @@ export function releaseCatalogMemory() {
 }
 
 export async function invalidatePersistentCatalogs() {
+  persistenceGeneration += 1;
   inFlight.clear();
   releaseCatalogMemory();
   await clearCatalogs();
