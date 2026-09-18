@@ -297,6 +297,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const playerRef = useRef<HTMLDivElement>(null);
   const tapRef = useRef<{ time: number; side: number } | null>(null);
   const singleTapTimerRef = useRef<number | null>(null);
+  const mouseClickStartedVisibleRef = useRef(true);
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const scrubRef = useRef<number | null>(null);
   const [scrubTime, setScrubTime] = useState<number | null>(null);
@@ -868,7 +869,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         style={{ touchAction: 'manipulation' }}
         aria-label="Playback gesture area"
         onPointerDown={(event) => {
-          if (!event.isPrimary || event.pointerType === 'mouse') return;
+          if (!event.isPrimary) return;
+          if (event.pointerType === 'mouse') {
+            mouseClickStartedVisibleRef.current = showControls;
+            return;
+          }
           touchStartRef.current = { x: event.clientX, y: event.clientY, time: Date.now() };
         }}
         onPointerCancel={() => {
@@ -880,6 +885,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           }
         }}
         onPointerUp={(event) => {
+          if (event.pointerType === 'mouse') {
+            if (!event.isPrimary || event.button !== 0) return;
+            setShowEpisodes(false);
+            if (mouseClickStartedVisibleRef.current) {
+              setShowControls(false);
+              if (controlsTimerRef.current !== null) {
+                window.clearTimeout(controlsTimerRef.current);
+                controlsTimerRef.current = null;
+              }
+            } else {
+              revealControls();
+            }
+            return;
+          }
+
           const start = touchStartRef.current;
           touchStartRef.current = null;
           if (
