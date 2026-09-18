@@ -204,20 +204,29 @@ export default function App() {
 
       try {
         if (view === 'live') {
-          const cats = await xtreamService.getCategories('live');
-          setCategories(cats);
+          const categoriesPromise = xtreamService.getCategories('live')
+            .then(setCategories)
+            .catch((error) => console.warn('Live category refresh notice:', error));
           const streams = await xtreamService.getLiveStreams(catId);
           setLiveChannels(streams);
+          setIsLoadingContent(false);
+          await categoriesPromise;
         } else if (view === 'vod') {
-          const cats = await xtreamService.getCategories('vod');
-          setCategories(cats);
+          const categoriesPromise = xtreamService.getCategories('vod')
+            .then(setCategories)
+            .catch((error) => console.warn('VOD category refresh notice:', error));
           const vodList = await xtreamService.getVodStreams(catId);
           setMovies(vodList);
+          setIsLoadingContent(false);
+          await categoriesPromise;
         } else if (view === 'series') {
-          const cats = await xtreamService.getCategories('series');
-          setCategories(cats);
+          const categoriesPromise = xtreamService.getCategories('series')
+            .then(setCategories)
+            .catch((error) => console.warn('Series category refresh notice:', error));
           const sList = await xtreamService.getSeries(catId);
           setSeries(sList);
+          setIsLoadingContent(false);
+          await categoriesPromise;
         }
       } catch (err: any) {
         console.error('Error loading content:', err);
