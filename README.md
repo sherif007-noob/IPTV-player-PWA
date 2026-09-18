@@ -27,6 +27,7 @@ The GitHub Actions workflow performs TypeScript validation and the production bu
 - [Player behavior contract](docs/PLAYER_BEHAVIOR.md)
 - [Data and cache architecture](docs/DATA_AND_CACHE.md)
 - [Cross-device QA checklist](docs/UX_QA_CHECKLIST.md)
+- [Pass 6 implementation audit](docs/PASS6_AUDIT.md)
 
 ## Important playback rule
 
