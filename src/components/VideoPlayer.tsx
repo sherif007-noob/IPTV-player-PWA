@@ -294,6 +294,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const feedbackTimerRef = useRef<number | null>(null);
   const controlsTimerRef = useRef<number | null>(null);
+  const controlsGenerationRef = useRef(0);
+  const controlsVisibleUntilRef = useRef(0);
   const playerRef = useRef<HTMLDivElement>(null);
   const tapRef = useRef<{ time: number; side: number } | null>(null);
   const singleTapTimerRef = useRef<number | null>(null);
@@ -328,56 +330,93 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setShowControls(visible);
   }, []);
 
-  const scheduleControlsHide = useCallback(() => {
-    if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current);
-    controlsTimerRef.current = null;
-    if (
-      isPlaying &&
-      !isBuffering &&
-      !playbackError &&
-      !showEpisodes &&
-      scrubRef.current === null &&
-      !keyboardFocus
-    ) {
-      controlsTimerRef.current = window.setTimeout(() => {
-        controlsTimerRef.current = null;
-        setControlsVisible(false);
-      }, 3000);
-    }
-  }, [isPlaying, isBuffering, playbackError, showEpisodes, keyboardFocus, setControlsVisible]);
-
-  const revealControls = useCallback(() => {
+  const cancelControlsHide = useCallback(() => {
+    controlsGenerationRef.current += 1;
+    controlsVisibleUntilRef.current = 0;
     if (controlsTimerRef.current !== null) {
       window.clearTimeout(controlsTimerRef.current);
       controlsTimerRef.current = null;
     }
-    setControlsVisible(true);
-    window.setTimeout(scheduleControlsHide, 0);
-  }, [scheduleControlsHide, setControlsVisible]);
+  }, []);
 
-  const toggleControls = useCallback(() => {
-    if (showControlsRef.current) {
-      if (controlsTimerRef.current !== null) {
-        window.clearTimeout(controlsTimerRef.current);
-        controlsTimerRef.current = null;
-      }
-      setControlsVisible(false);
+  const scheduleControlsHide = useCallback((visibleForMs: number = 3000) => {
+    cancelControlsHide();
+
+    if (
+      !isPlaying ||
+      isBuffering ||
+      !!playbackError ||
+      showEpisodes ||
+      scrubRef.current !== null ||
+      keyboardFocus
+    ) {
       return;
     }
-    revealControls();
-  }, [revealControls, setControlsVisible]);
+
+    const generation = controlsGenerationRef.current;
+    const deadline = performance.now() + visibleForMs;
+    controlsVisibleUntilRef.current = deadline;
+
+    const attemptHide = () => {
+      if (generation !== controlsGenerationRef.current) return;
+
+      const remaining = controlsVisibleUntilRef.current - performance.now();
+      if (remaining > 24) {
+        controlsTimerRef.current = window.setTimeout(attemptHide, Math.ceil(remaining));
+        return;
+      }
+
+      controlsTimerRef.current = null;
+      controlsVisibleUntilRef.current = 0;
+      setControlsVisible(false);
+    };
+
+    controlsTimerRef.current = window.setTimeout(attemptHide, visibleForMs);
+  }, [
+    cancelControlsHide,
+    isPlaying,
+    isBuffering,
+    playbackError,
+    showEpisodes,
+    keyboardFocus,
+    setControlsVisible,
+  ]);
+
+  const revealControls = useCallback((visibleForMs: number = 3000) => {
+    setControlsVisible(true);
+    scheduleControlsHide(visibleForMs);
+  }, [scheduleControlsHide, setControlsVisible]);
+
+  const hideControls = useCallback(() => {
+    cancelControlsHide();
+    setControlsVisible(false);
+  }, [cancelControlsHide, setControlsVisible]);
+
+  const toggleControls = useCallback(() => {
+    if (showControlsRef.current) hideControls();
+    else revealControls();
+  }, [hideControls, revealControls]);
 
   useEffect(() => {
     if (isBuffering || playbackError || showEpisodes || scrubTime !== null || keyboardFocus || !isPlaying) {
+      cancelControlsHide();
       setControlsVisible(true);
-      if (controlsTimerRef.current !== null) {
-        window.clearTimeout(controlsTimerRef.current);
-        controlsTimerRef.current = null;
-      }
       return;
     }
-    scheduleControlsHide();
-  }, [isBuffering, playbackError, showEpisodes, scrubTime, keyboardFocus, isPlaying, scheduleControlsHide, setControlsVisible]);
+
+    // Playback became eligible for auto-hide. Start one fresh visibility window.
+    revealControls();
+  }, [
+    isBuffering,
+    playbackError,
+    showEpisodes,
+    scrubTime,
+    keyboardFocus,
+    isPlaying,
+    cancelControlsHide,
+    revealControls,
+    setControlsVisible,
+  ]);
 
   useEffect(() => () => {
     if (feedbackTimerRef.current !== null) window.clearTimeout(feedbackTimerRef.current);
@@ -913,15 +952,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           if (event.pointerType === 'mouse') {
             if (!event.isPrimary || event.button !== 0) return;
             setShowEpisodes(false);
-            if (mouseClickStartedVisibleRef.current) {
-              setControlsVisible(false);
-              if (controlsTimerRef.current !== null) {
-                window.clearTimeout(controlsTimerRef.current);
-                controlsTimerRef.current = null;
-              }
-            } else {
-              revealControls();
-            }
+            if (mouseClickStartedVisibleRef.current) hideControls();
+            else revealControls();
             return;
           }
 
@@ -972,15 +1004,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
       {isBuffering && !playbackError && (
         <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-          <div className="rounded-xl border border-slate-700 bg-black/90 px-5 py-3 text-sm font-semibold text-slate-200">
+          <div className="player-buffering-card glass-surface rounded-xl px-5 py-3 text-sm font-semibold text-slate-100">
             Buffering stream...
           </div>
         </div>
       )}
 
       {playbackError && (
-        <div className="absolute inset-0 z-40 bg-black/95 flex items-center justify-center p-6">
-          <div className="max-w-lg w-full rounded-2xl border border-rose-500/40 bg-slate-950 p-6 text-center space-y-4">
+        <div className="player-error-backdrop absolute inset-0 z-40 flex items-center justify-center p-6">
+          <div className="player-error-card glass-modal max-w-lg w-full rounded-2xl border-rose-500/35 p-6 text-center space-y-4">
             <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto" />
             <h3 className="text-xl font-bold text-white">Playback Error</h3>
             <p className="text-sm text-slate-300">{playbackError}</p>
@@ -992,9 +1024,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   setIsBuffering(true);
                   setActiveUrl((previous) => buildPlaybackUrl(previous, getSourceStart(previous)));
                 }}
-                className="px-4 py-2 rounded-lg bg-sky-500 text-white font-semibold"
+                className="player-primary-control tv-focus px-4 py-2 rounded-lg text-white font-semibold"
               >Retry</button>
-              <button aria-label="Close player" onClick={closePlayer} className="px-4 py-2 rounded-lg bg-slate-800 text-white font-semibold">Close</button>
+              <button aria-label="Close player" onClick={closePlayer} className="player-control glass-control tv-focus px-4 py-2 rounded-lg text-white font-semibold">Close</button>
             </div>
           </div>
         </div>
@@ -1010,16 +1042,16 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               : 'inset-x-0 justify-center'
           }`}
         >
-          <div className="rounded-xl border border-sky-500/50 bg-black/85 px-6 py-4 text-xl font-bold text-white backdrop-blur-md shadow-xl">
+          <div className="player-seek-feedback-card glass-control rounded-xl border-sky-500/45 px-6 py-4 text-xl font-bold text-white">
             {seekFeedback}
           </div>
         </div>
       )}
 
-      <div inert={!showControls} className={`player-top absolute top-0 inset-x-0 z-30 p-5 bg-gradient-to-b from-black/95 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <div className="flex items-center justify-between gap-4">
+      <div inert={!showControls} className={`player-top absolute top-0 inset-x-0 z-30 p-5 bg-gradient-to-b from-black/55 via-black/20 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div className="player-osd-surface player-osd-top glass-chrome mx-auto max-w-6xl rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <button aria-label="Close player" onClick={closePlayer} className="p-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white">
+            <button aria-label="Close player" onClick={closePlayer} className="player-control glass-control tv-focus icon-control rounded-xl text-white">
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="min-w-0">
@@ -1038,7 +1070,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 setShowEpisodes((value) => !value);
                 revealControls();
               }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900/80 border border-slate-700 text-white text-sm"
+              className="player-control glass-control tv-focus flex items-center gap-2 px-3 py-2 rounded-xl text-white text-sm"
             >
               <Clapperboard className="w-4 h-4" /> Episodes
             </button>
@@ -1047,7 +1079,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       </div>
 
       {showEpisodes && isSeries && seriesContext?.allEpisodes && (
-        <div className="player-episodes absolute top-20 right-5 z-40 w-80 max-w-[calc(100%-2.5rem)] max-h-[60dvh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950/95 p-3 space-y-2">
+        <div className="player-episodes glass-chrome absolute top-20 right-5 z-40 w-80 max-w-[calc(100%-2.5rem)] max-h-[60dvh] overflow-y-auto rounded-2xl p-3 space-y-2">
           {seriesContext.allEpisodes.map((episode) => {
             const watched = isEpisodeWatched
               ? isEpisodeWatched(seriesContext.seriesId, seriesContext.seasonNum, episode.episode_num)
@@ -1063,10 +1095,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   setShowEpisodes(false);
                 }}
                 aria-current={episode.id === seriesContext.episode.id ? 'true' : undefined}
-                className={`w-full min-h-12 text-left rounded-lg border p-3 text-sm text-white transition-colors ${ 
+                className={`player-episode-row glass-control tv-focus w-full min-h-12 text-left rounded-xl border p-3 text-sm text-white transition-all duration-200 ${
                   episode.id === seriesContext.episode.id
-                    ? 'border-sky-500/60 bg-sky-500/15'
-                    : 'border-slate-800 bg-slate-900'
+                    ? 'border-sky-500/60 bg-sky-500/15 shadow-[0_0_18px_rgba(56,189,248,0.12)]'
+                    : 'hover:border-white/20'
                 }`}
               >
                 <div className="font-semibold">Episode {episode.episode_num}</div>
@@ -1079,7 +1111,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       )}
 
-      <div inert={!showControls} className={`player-bottom absolute bottom-0 inset-x-0 z-30 p-5 bg-gradient-to-t from-black/95 via-black/75 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+      <div inert={!showControls} className={`player-bottom absolute bottom-0 inset-x-0 z-30 p-5 bg-gradient-to-t from-black/65 via-black/25 to-transparent transition-opacity ${showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+        <div className="player-osd-surface player-osd-bottom glass-chrome mx-auto max-w-6xl rounded-2xl p-3 sm:p-4">
         {!isLive && (
           <div className="mb-4">
             <div className="relative h-11 flex items-center">
@@ -1089,7 +1122,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </div>
               {scrubTime !== null && duration > 0 && (
                 <div
-                  className="player-scrub-preview absolute bottom-9 -translate-x-1/2 pointer-events-none rounded-lg border border-sky-500/40 bg-black/90 px-2.5 py-1.5 text-xs font-mono font-semibold text-white shadow-xl"
+                  className="player-scrub-preview glass-control absolute bottom-9 -translate-x-1/2 pointer-events-none rounded-lg border-sky-500/40 px-2.5 py-1.5 text-xs font-mono font-semibold text-white"
                   style={{ left: `${Math.max(2, Math.min(98, (scrubTime / duration) * 100))}%` }}
                 >
                   {formatTime(scrubTime)}
@@ -1107,7 +1140,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 aria-valuemin={0} aria-valuemax={duration || 1}
                 aria-valuenow={scrubTime ?? Math.min(currentTime, duration || 1)}
                 aria-disabled={!(duration > 0)}
-                className="seek-slider absolute inset-0 w-full h-full cursor-pointer touch-none rounded-full"
+                className="seek-slider tv-focus absolute inset-0 w-full h-full cursor-pointer touch-none rounded-full"
                 onPointerDown={(event) => {
                   if (!event.isPrimary || event.button !== 0 || !(duration > 0)) return;
                   event.preventDefault();
@@ -1151,13 +1184,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <button aria-label={isPlaying ? "Pause" : "Play"} onClick={togglePlay} className="w-11 h-11 rounded-xl bg-sky-500 text-white flex items-center justify-center">
+            <button aria-label={isPlaying ? "Pause" : "Play"} onClick={togglePlay} className="player-primary-control tv-focus w-11 h-11 rounded-xl text-white flex items-center justify-center">
               {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
             </button>
 
             {!isLive && (
               <>
-                <button onClick={() => handleSeek(-10, 'left')} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white flex items-center gap-1 text-sm">
+                <button onClick={() => handleSeek(-10, 'left')} className="player-control glass-control tv-focus p-2.5 rounded-xl text-white flex items-center gap-1 text-sm">
                   <RotateCcw className="w-4 h-4" /> 10s
                 </button>
                 <button onClick={() => handleSeek(10, 'right')} className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white flex items-center gap-1 text-sm">
@@ -1174,7 +1207,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 video.muted = !video.muted;
                 setIsMuted(video.muted);
               }}
-              className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 text-white"
+              className="player-control glass-control tv-focus p-2.5 rounded-xl text-white"
             >
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
@@ -1195,7 +1228,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     video.textTracks[index].mode = index === selected ? 'showing' : 'disabled';
                   }
                 }}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-sm text-white"
+                className="player-control glass-control tv-focus rounded-lg px-2 py-1 text-sm text-white"
               >
                 <option value={-1}>Subtitles off</option>
                 {subtitleTracks.map((track) => (
@@ -1204,6 +1237,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </select>
             </div>
           )}
+        </div>
         </div>
       </div>
     </div>
