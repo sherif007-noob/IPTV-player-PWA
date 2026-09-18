@@ -107,16 +107,14 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
             }}
             title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
             aria-pressed={isFavorite}
-            className={`stream-card-action rounded-xl transition-all duration-200 ${
-              isFavorite
-                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/40'
-                : 'bg-slate-950/70 border border-white/10 text-slate-300 hover:text-amber-400 hover:bg-slate-900/90'
+            className={`stream-card-action rounded-xl transition-all duration-200 bg-transparent border-0 shadow-none flex items-center justify-center ${
+              isFavorite ? 'text-slate-950' : 'text-slate-300 hover:text-amber-400'
             }`}
           >
             <span className={`stream-card-action-visual p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
               isFavorite
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/40'
-                : 'bg-slate-950/70 border border-white/10 text-slate-300'
+                : 'bg-slate-950/70 border border-white/10'
             }`}>
               <Star className={`w-3.5 h-3.5 ${isFavorite ? 'fill-current' : ''}`} />
             </span>
@@ -131,16 +129,14 @@ const StreamCardComponent: React.FC<StreamCardProps> = ({
               }}
               title={isInWatchlist ? 'In watchlist' : 'Add to watchlist'}
               aria-pressed={isInWatchlist}
-              className={`stream-card-action p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
-                isInWatchlist
-                  ? 'bg-sky-500 text-white shadow-md shadow-sky-500/40'
-                  : 'bg-slate-950/70 border border-white/10 text-slate-300 hover:text-sky-400 hover:bg-slate-900/90'
+              className={`stream-card-action rounded-xl transition-all duration-200 bg-transparent border-0 shadow-none flex items-center justify-center ${
+                isInWatchlist ? 'text-white' : 'text-slate-300 hover:text-sky-400'
               }`}
             >
               <span className={`stream-card-action-visual p-1.5 rounded-xl backdrop-blur-md transition-all duration-200 ${
                 isInWatchlist
                   ? 'bg-sky-500 text-white shadow-md shadow-sky-500/40'
-                  : 'bg-slate-950/70 border border-white/10 text-slate-300'
+                  : 'bg-slate-950/70 border border-white/10'
               }`}>
                 <Bookmark className={`w-3.5 h-3.5 ${isInWatchlist ? 'fill-current' : ''}`} />
               </span>
