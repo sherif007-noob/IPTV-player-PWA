@@ -1,4 +1,4 @@
-import { useDialog } from '../hooks/useDialog';
+import { ModalShell } from './ModalShell';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, X, Tv, Film, Clapperboard, Star, Clock } from 'lucide-react';
 import { ContentItem, ContentType } from '../types';
@@ -18,8 +18,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   onSelectItem,
   activeContentType = 'all',
 }) => {
-  const dialogRef = useDialog(isOpen, onClose);
-  const backdropStart = React.useRef(false);
   const [query, setQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState<'all' | ContentType>(activeContentType);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -48,24 +46,15 @@ export const SearchModal: React.FC<SearchModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      id="search-modal-backdrop"
-      onPointerDown={(event) => { backdropStart.current = event.target === event.currentTarget; }}
-      onClick={(event) => {
-        if (backdropStart.current && event.target === event.currentTarget) onClose();
-        backdropStart.current = false;
-      }}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-2xl flex flex-col items-center p-4 sm:p-8"
+    <ModalShell
+      open={isOpen}
+      onClose={onClose}
+      overlayId="search-modal-backdrop"
+      cardId="search-container-box"
+      ariaLabel="Search library"
+      overlayClassName="z-50 bg-black/80 backdrop-blur-2xl flex-col items-center p-4 sm:p-8"
+      cardClassName="w-full max-w-4xl bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col max-h-[85dvh] shadow-2xl shadow-black/80"
     >
-      <div
-        id="search-container-box"
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Search library"
-        tabIndex={-1}
-        className="w-full max-w-4xl bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-3xl overflow-hidden flex flex-col max-h-[85vh] shadow-2xl shadow-black/80"
-      >
         {/* Search Input Bar */}
         <div className="p-4 sm:p-5 border-b border-white/10 flex items-center gap-3 bg-slate-950/70 backdrop-blur-md">
           <Search className="w-5 h-5 text-sky-400 shrink-0 drop-shadow-[0_0_8px_rgba(56,189,248,0.5)]" />
@@ -220,7 +209,6 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </ModalShell>
   );
 };
