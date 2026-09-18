@@ -119,7 +119,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
           data-skip-spatial="true"
           onClick={handleInstall}
           title={isIOS ? 'Install PWA on iPhone/iPad' : 'Install PWA Application'}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-sky-500/25 tv-focus transition-all duration-200 shrink-0"
+          className="header-control header-icon-control-mobile flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-sky-500/25 tv-focus transition-all duration-200 shrink-0"
         >
           <Download className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">{isIOS ? 'Install PWA' : 'Install App'}</span>
