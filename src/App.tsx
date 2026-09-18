@@ -1113,10 +1113,18 @@ export default function App() {
   }, [currentView, storage.favorites]);
 
   const sectionContinueCount = useMemo(() => {
-    if (currentView === 'live' || currentView === 'vod' || currentView === 'series') {
-      return storage.continueWatching.filter((c) => c.type === currentView).length;
-    }
-    return storage.continueWatching.length;
+    const relevant =
+      currentView === 'live' || currentView === 'vod' || currentView === 'series'
+        ? storage.continueWatching.filter((item) => item.type === currentView)
+        : storage.continueWatching;
+
+    return new Set(
+      relevant.map((item) =>
+        item.type === 'series'
+          ? `series:${item.seriesId || item.id}`
+          : `${item.type}:${item.id}`
+      )
+    ).size;
   }, [currentView, storage.continueWatching]);
 
   const sectionWatchlistCount = useMemo(() => {
