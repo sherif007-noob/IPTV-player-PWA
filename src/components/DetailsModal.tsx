@@ -476,13 +476,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                         item.container_extension ||
                         'mkv';
                       onPlay(
-                        {
-                          ...item,
-                          container_extension: resolvedExt,
-                          direct_source:
-                            vodDetails?.movie_data?.direct_source ||
-                            item.direct_source,
-                        },
+                        { ...item, container_extension: resolvedExt },
                         progress.timestamp
                       );
                     }}
@@ -504,16 +498,7 @@ export const DetailsModal: React.FC<DetailsModalProps> = ({
                       vodDetails?.movie_data?.container_extension ||
                       item.container_extension ||
                       'mkv';
-                    onPlay(
-                      {
-                        ...item,
-                        container_extension: resolvedExt,
-                        direct_source:
-                          vodDetails?.movie_data?.direct_source ||
-                          item.direct_source,
-                      },
-                      0
-                    );
+                    onPlay({ ...item, container_extension: resolvedExt }, 0);
                   }}
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-sky-500 text-white font-bold text-sm hover:bg-sky-400 tv-focus shadow-lg transition-all"
                 >

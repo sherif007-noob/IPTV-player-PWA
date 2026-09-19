@@ -653,11 +653,9 @@ export class XtreamService {
   public getStreamUrl(
     type: 'live' | 'vod' | 'series',
     streamId: string | number,
-    extension?: string,
-    directSource?: string
+    extension?: string
   ): string {
-    const suppliedDirectSource = typeof directSource === 'string' ? directSource.trim() : '';
-    const streamTarget = suppliedDirectSource || this.getDirectStreamTarget(type, streamId, extension);
+    const streamTarget = this.getDirectStreamTarget(type, streamId, extension);
     const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
     const isHttpsBrowser = typeof window !== 'undefined' && window.location.protocol === 'https:';
     

@@ -674,15 +674,10 @@ export default function App() {
       url = channel?.direct_source || xtreamService.getStreamUrl('live', item.id);
     } else if (item.type === 'vod') {
       const ext = item.container_extension;
-      url = xtreamService.getStreamUrl('vod', item.id, ext, item.direct_source);
+      url = xtreamService.getStreamUrl('vod', item.id, ext);
     } else if (item.type === 'series' && seriesMeta) {
       const ext = seriesMeta.episode.container_extension;
-      url = xtreamService.getStreamUrl(
-        'series',
-        seriesMeta.episode.id,
-        ext,
-        seriesMeta.episode.direct_source
-      );
+      url = xtreamService.getStreamUrl('series', seriesMeta.episode.id, ext);
     }
 
     setActivePlayer({

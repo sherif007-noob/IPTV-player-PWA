@@ -80,7 +80,6 @@ export interface VodMovie {
   added?: string;
   category_id: string;
   container_extension?: string;
-  direct_source?: string;
   is4k?: boolean;
   year?: string;
 }
@@ -115,7 +114,6 @@ export interface VodDetails {
     stream_id: number;
     name?: string;
     container_extension?: string;
-    direct_source?: string;
   };
 }
 
@@ -143,7 +141,6 @@ export interface Episode {
   episode_num: number;
   title: string;
   container_extension?: string;
-  direct_source?: string;
   season: number;
   info: {
     duration_secs?: number;
@@ -217,7 +214,6 @@ export interface ContentItem {
   rating?: string | number;
   year?: string;
   container_extension?: string;
-  direct_source?: string;
   plot?: string;
   cast?: string;
   director?: string;
