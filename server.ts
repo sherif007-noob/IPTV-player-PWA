@@ -4,7 +4,6 @@ import os from "os";
 import path from "path";
 import { Readable } from "stream";
 import { spawn } from "child_process";
-import { setDefaultResultOrder } from "node:dns";
 import ffmpegPath from "ffmpeg-static";
 import { createServer as createViteServer } from "vite";
 
@@ -17,11 +16,6 @@ const ALLOWED_IPTV_HOSTS = process.env.ALLOWED_IPTV_HOSTS
 const PORT = Number(process.env.PORT || 8080);
 const HLS_ROOT = path.join(os.tmpdir(), `iptv-player-hls-${PORT}`);
 
-// IPTV providers frequently publish IPv4 endpoints alongside unusable or flaky IPv6 routes.
-// Node/Undici otherwise follows the OS resolver order, which can surface only as a generic
-// `TypeError: fetch failed`. Prefer IPv4 for provider/API traffic while keeping the existing
-// fetch/HLS architecture unchanged.
-setDefaultResultOrder("ipv4first");
 
 type StopFn = (reason: string) => void;
 
@@ -196,7 +190,7 @@ async function startServer() {
   const hlsTranscodeArgs = () => [
     "-map", "0:v:0", "-map", "0:a:0?",
     "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency",
-    "-profile:v", "main", "-level:v", "4.1", "-pix_fmt", "yuv420p",
+    "-profile:v", "main", "-level:v", "3.1", "-pix_fmt", "yuv420p",
     "-bf", "0", "-refs", "1", "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
     "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
     "-avoid_negative_ts", "make_zero",
@@ -282,137 +276,59 @@ async function startServer() {
     const dir = hlsDir(session, playback);
     await fs.promises.mkdir(dir, { recursive: true });
 
+    const headers = upstreamHeaders(req);
+    const ffmpegHeaders = Object.entries(headers)
+      .filter(([key]) => !["user-agent", "referer", "host"].includes(key.toLowerCase()))
+      .map(([key, value]) => `${key}: ${value}`)
+      .join("\r\n");
     const playlist = path.join(dir, "index.m3u8");
     const segmentPattern = path.join(dir, "segment-%06d.ts");
-    const outputArgs = [
+    const args = [
+      "-hide_banner", "-loglevel", "info", "-nostdin",
+      "-re",
+      ...(start > 0 ? ["-ss", String(start)] : []),
+      "-user_agent", headers["User-Agent"] || PROVIDER_USER_AGENT,
+      ...(headers.Referer ? ["-referer", headers.Referer] : []),
+      ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\r\n`] : []),
+      "-rw_timeout", "120000000",
+      "-i", url,
       ...hlsTranscodeArgs(),
       "-f", "hls",
       "-hls_time", "2",
-      "-hls_list_size", "0",
-      "-hls_playlist_type", "event",
-      "-hls_flags", "independent_segments+temp_file",
+      "-hls_list_size", "8",
+      "-hls_delete_threshold", "3",
+      "-hls_flags", "delete_segments+independent_segments+temp_file",
       "-hls_segment_filename", segmentPattern,
       playlist,
     ];
 
+    console.log(`Starting generated HLS session=${session} playback=${playback} start=${start}s inputUrl=${url}`);
+    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stopped = false;
     let stderr = "";
-    let bridgeToken = "";
-    let readable: Readable | null = null;
-    let abortController: AbortController | null = null;
-
-    let ffmpeg;
-    if (start > 0) {
-      bridgeToken = `${session}--${playback}`;
-      bridgeInputs.set(bridgeToken, {
-        url,
-        headers: upstreamHeaders(req),
-      });
-
-      const bridgeUrl =
-        `http://127.0.0.1:${PORT}/api/internal/hls-input/${encodeURIComponent(bridgeToken)}`;
-      const args = [
-        "-hide_banner", "-loglevel", "info", "-nostdin",
-        "-ss", String(start),
-        "-i", bridgeUrl,
-        ...outputArgs,
-      ];
-
-      console.log(
-        `Starting instant-seek HLS via Node range bridge session=${session} playback=${playback} start=${start}s source=${url}`
-      );
-      ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
-    } else {
-      abortController = new AbortController();
-      console.log(
-        `Fetching provider media in Node session=${session} playback=${playback} start=0s url=${url}`
-      );
-      let upstream: Response;
-      try {
-        upstream = await fetch(url, {
-          method: "GET",
-          headers: upstreamHeaders(req),
-          redirect: "follow",
-          signal: abortController.signal,
-        });
-      } catch (error: any) {
-        throw new Error(`Provider fetch failed: ${describeNetworkError(error)}`, { cause: error });
-      }
-      if (!upstream.ok || !upstream.body) {
-        try { await upstream.body?.cancel(); } catch {}
-        throw new Error(`Provider media request failed with HTTP ${upstream.status}`);
-      }
-
-      console.log(
-        `Provider media response status=${upstream.status} type=${upstream.headers.get("content-type") || "unknown"} length=${upstream.headers.get("content-length") || "unknown"} finalUrl=${upstream.url || url}`
-      );
-
-      const args = [
-        "-hide_banner", "-loglevel", "info", "-nostdin",
-        "-i", "pipe:0",
-        ...outputArgs,
-      ];
-
-      console.log(
-        `Starting generated HLS from Node pipe session=${session} playback=${playback} start=0s source=${upstream.url || url}`
-      );
-      ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "ignore", "pipe"] });
-      readable = Readable.fromWeb(upstream.body as any);
-      readable.on("error", (error: any) => {
-        if (!stopped) {
-          console.warn(
-            `Provider stream error session=${session} playback=${playback}: ${error?.message || error}`
-          );
-        }
-        try { ffmpeg.stdin.destroy(error); } catch {}
-      });
-      ffmpeg.stdin.on("error", (error: any) => {
-        if (!stopped && error?.code !== "EPIPE") {
-          console.warn(
-            `FFmpeg HLS stdin error session=${session} playback=${playback}: ${error?.message || error}`
-          );
-        }
-      });
-      readable.pipe(ffmpeg.stdin);
-    }
 
     const stop: StopFn = (reason) => {
       if (stopped) return;
       stopped = true;
       console.log(`Generated HLS stop session=${session} playback=${playback}: ${reason}`);
-      if (bridgeToken) bridgeInputs.delete(bridgeToken);
-      try { abortController?.abort(); } catch {}
-      try { readable?.destroy(); } catch {}
-      try { ffmpeg.stdin?.destroy(); } catch {}
       try { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); } catch {}
       removePathSoon(dir);
     };
 
     register(session, playback, stop);
-
     ffmpeg.stderr.on("data", (chunk) => {
       const text = chunk.toString();
       stderr = (stderr + text).slice(-8000);
       console.log(`FFmpeg HLS: ${text.trimEnd()}`);
     });
-
     ffmpeg.on("error", (error) => {
-      if (bridgeToken) bridgeInputs.delete(bridgeToken);
-      try { abortController?.abort(); } catch {}
-      try { readable?.destroy(); } catch {}
-      console.warn(
-        `FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`
-      );
+      console.warn(`FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`);
       clearActive(session, playback);
     });
-
-    ffmpeg.on("close", (code, signal) => {
-      if (bridgeToken) bridgeInputs.delete(bridgeToken);
-      try { abortController?.abort(); } catch {}
-      try { readable?.destroy(); } catch {}
+    ffmpeg.on("close", (code) => {
       clearActive(session, playback);
       console.log(
-        `FFmpeg HLS exited code=${code} signal=${signal || "none"} stopped=${stopped} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
+        `FFmpeg HLS exited code=${code} stopped=${stopped} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
       );
       if (!stopped) removePathSoon(dir, 5 * 60 * 1000);
     });
