@@ -3,8 +3,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Readable } from "stream";
-import { spawn } from "child_process";
-import ffmpegPath from "ffmpeg-static";
+import { spawn, spawnSync } from "child_process";
+import ffmpegStaticPath from "ffmpeg-static";
 import { createServer as createViteServer } from "vite";
 
 const PROVIDER_USER_AGENT = process.env.PROVIDER_USER_AGENT || "IPTVSmartersPlayer/3.0.0";
@@ -15,6 +15,42 @@ const ALLOWED_IPTV_HOSTS = process.env.ALLOWED_IPTV_HOSTS
   : [];
 const PORT = Number(process.env.PORT || 8080);
 const HLS_ROOT = path.join(os.tmpdir(), `iptv-player-hls-${PORT}`);
+
+
+function canRunExecutable(command: string) {
+  try {
+    const probe = spawnSync(command, ["-version"], {
+      stdio: "ignore",
+      timeout: 5000,
+      windowsHide: true,
+    });
+    return !probe.error && probe.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function resolveFfmpegExecutable() {
+  const configured = String(process.env.FFMPEG_PATH || "").trim();
+  if (configured && canRunExecutable(configured)) {
+    return { path: configured, source: "FFMPEG_PATH" };
+  }
+
+  // Prefer the host FFmpeg build when available. It uses the OS networking/runtime
+  // instead of the bundled static build and is generally the most compatible choice
+  // for provider HTTP redirects on Linux desktops.
+  if (canRunExecutable("ffmpeg")) {
+    return { path: "ffmpeg", source: "system PATH" };
+  }
+
+  if (ffmpegStaticPath && canRunExecutable(ffmpegStaticPath)) {
+    return { path: ffmpegStaticPath, source: "ffmpeg-static fallback" };
+  }
+
+  return { path: "", source: "unavailable" };
+}
+
+const FFMPEG = resolveFfmpegExecutable();
 
 
 type StopFn = (reason: string) => void;
@@ -267,7 +303,7 @@ async function startServer() {
     playback: string,
     start: number
   ) {
-    if (!ffmpegPath) throw new Error("FFmpeg is unavailable");
+    if (!FFMPEG.path) throw new Error("FFmpeg is unavailable");
     if (active.get(session)?.playback === playback) return;
 
     stopActive(session, undefined, "new playback for same player session");
@@ -303,7 +339,7 @@ async function startServer() {
     ];
 
     console.log(`Starting generated HLS session=${session} playback=${playback} start=${start}s inputUrl=${url}`);
-    const ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
+    const ffmpeg = spawn(FFMPEG.path, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stopped = false;
     let stderr = "";
 
@@ -325,10 +361,10 @@ async function startServer() {
       console.warn(`FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`);
       clearActive(session, playback);
     });
-    ffmpeg.on("close", (code) => {
+    ffmpeg.on("close", (code, signal) => {
       clearActive(session, playback);
       console.log(
-        `FFmpeg HLS exited code=${code} stopped=${stopped} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
+        `FFmpeg HLS exited code=${code} signal=${signal || "none"} stopped=${stopped} binary=${FFMPEG.source} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
       );
       if (!stopped) removePathSoon(dir, 5 * 60 * 1000);
     });
@@ -494,7 +530,7 @@ async function startServer() {
     status: "ok",
     device: "webos-iptv-player",
     playbackTransport: "hls",
-    ffmpegAvailable: !!ffmpegPath,
+    ffmpegAvailable: !!FFMPEG.path,
     activeTranscodes: active.size,
     hlsRoot: HLS_ROOT,
     upstreamUserAgent: PROVIDER_USER_AGENT,
