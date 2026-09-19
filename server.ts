@@ -545,9 +545,10 @@ async function startServer() {
     app.get("*", (_req, res) => res.sendFile(path.join(dist, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () =>
-    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT} (universal HLS playback)`)
-  );
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT} (universal HLS playback)`);
+    console.log(`FFmpeg runtime: ${FFMPEG.source}${FFMPEG.path ? ` (${FFMPEG.path})` : ""}`);
+  });
 }
 
 startServer();
