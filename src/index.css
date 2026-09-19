@@ -326,7 +326,7 @@ video {
   padding-right: max(1.25rem, env(safe-area-inset-right));
 }
 #video-player button, #video-player select { min-width: 44px; min-height: 44px; }
-#video-player .seek-slider:focus-visible { outline: 2px solid var(--ds-sky); outline-offset: 2px; }
+#video-player .seek-slider:focus-visible { outline: none; }
 .modal-shell {
   width: 100vw;
   width: 100dvw;
@@ -1153,11 +1153,29 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   --player-edge-top: max(12px, env(safe-area-inset-top));
   --player-edge-bottom: max(12px, env(safe-area-inset-bottom));
 }
-#video-player .player-seek-thumb {
-  opacity: 0.9;
+#video-player .player-seek-track {
+  position: relative;
 }
-#video-player .seek-slider:hover ~ .player-seek-thumb,
-#video-player .seek-slider:focus-visible ~ .player-seek-thumb {
+#video-player .player-seek-rail {
+  transition:
+    box-shadow var(--ds-motion-fast) var(--ds-ease-standard),
+    filter var(--ds-motion-fast) var(--ds-ease-standard);
+}
+#video-player .player-seek-thumb {
+  top: 50% !important;
+  margin: 0 !important;
+  opacity: 0.95;
+  transform-origin: center;
+}
+#video-player .player-seek-zone:has(.seek-slider:hover) .player-seek-rail,
+#video-player .player-seek-zone:has(.seek-slider:focus-visible) .player-seek-rail {
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.72),
+    0 0 6px rgba(56, 189, 248, 0.48);
+  filter: brightness(1.08);
+}
+#video-player .player-seek-zone:has(.seek-slider:hover) .player-seek-thumb,
+#video-player .player-seek-zone:has(.seek-slider:focus-visible) .player-seek-thumb {
   transform: translate(-50%, -50%) scale(1.08);
 }
 #video-player .player-scrub-preview {
@@ -1354,8 +1372,8 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     transform: translate(-50%, -50%) scale(0);
     transition: left 75ms linear, transform 150ms ease-out;
   }
-  #video-player .relative.h-11:has(.seek-slider:hover) .player-seek-thumb,
-  #video-player .relative.h-11:has(.seek-slider:focus-visible) .player-seek-thumb {
+  #video-player .player-seek-zone:has(.seek-slider:hover) .player-seek-thumb,
+  #video-player .player-seek-zone:has(.seek-slider:focus-visible) .player-seek-thumb {
     transform: translate(-50%, -50%) scale(1);
   }
 }

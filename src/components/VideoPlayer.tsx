@@ -1144,9 +1144,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <div className="player-osd-surface player-osd-bottom glass-chrome mx-auto max-w-6xl rounded-2xl p-3 sm:p-4">
         {!isLive && (
           <div className="mb-4">
-            <div className="relative h-11 flex items-center">
+            <div className="player-seek-zone relative h-11 flex items-center">
               <div className="player-seek-track relative h-3 w-full pointer-events-none">
-                <div className="absolute inset-0 rounded-full bg-slate-800 overflow-hidden">
+                <div className="player-seek-rail absolute inset-0 rounded-full bg-slate-800 overflow-hidden">
                   <div className="absolute inset-y-0 left-0 bg-slate-600/60" style={{ width: `${bufferPercent}%` }} />
                   <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-sky-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.65)] transition-[width] duration-300" style={{ width: `${progressPercent}%` }} />
                 </div>
@@ -1171,7 +1171,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 aria-valuemin={0} aria-valuemax={duration || 1}
                 aria-valuenow={scrubTime ?? Math.min(currentTime, duration || 1)}
                 aria-disabled={!(duration > 0)}
-                className="seek-slider tv-focus absolute inset-0 w-full h-full cursor-pointer touch-none rounded-full"
+                className="seek-slider absolute inset-0 w-full h-full cursor-pointer touch-none outline-none"
                 onPointerDown={(event) => {
                   if (!event.isPrimary || event.button !== 0 || !(duration > 0)) return;
                   event.preventDefault();

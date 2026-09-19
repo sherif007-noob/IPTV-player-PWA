@@ -178,6 +178,23 @@ async function startServer() {
     "-avoid_negative_ts", "make_zero",
   ];
 
+  function ffmpegProviderInputArgs(req: express.Request, url: string, start: number) {
+    const headers = upstreamHeaders(req);
+    const ffmpegHeaders = Object.entries(headers)
+      .filter(([key]) => !["user-agent", "referer", "host"].includes(key.toLowerCase()))
+      .map(([key, value]) => `${key}: ${value}`)
+      .join("\r\n");
+
+    return [
+      ...(start > 0 ? ["-ss", String(start)] : []),
+      "-user_agent", headers["User-Agent"] || PROVIDER_USER_AGENT,
+      ...(headers.Referer ? ["-referer", headers.Referer] : []),
+      ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\r\n`] : []),
+      "-rw_timeout", "120000000",
+      "-i", url,
+    ];
+  }
+
   async function waitForPlaylist(file: string, timeoutMs = 25000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
@@ -279,72 +296,91 @@ async function startServer() {
 
     let ffmpeg;
     if (start > 0) {
-      bridgeToken = `${session}--${playback}`;
-      bridgeInputs.set(bridgeToken, {
-        url,
-        headers: upstreamHeaders(req),
-      });
-
-      const bridgeUrl =
-        `http://127.0.0.1:${PORT}/api/internal/hls-input/${encodeURIComponent(bridgeToken)}`;
+      // Seeking must not depend on Node/undici being able to reach the provider.
+      // FFmpeg's HTTP stack handles byte-range seeking directly and receives the
+      // same provider identity headers.
       const args = [
         "-hide_banner", "-loglevel", "info", "-nostdin",
-        "-ss", String(start),
-        "-i", bridgeUrl,
+        ...ffmpegProviderInputArgs(req, url, start),
         ...outputArgs,
       ];
-
       console.log(
-        `Starting instant-seek HLS via Node range bridge session=${session} playback=${playback} start=${start}s source=${url}`
+        `Starting instant-seek HLS via direct FFmpeg provider input session=${session} playback=${playback} start=${start}s source=${url}`
       );
       ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
     } else {
       abortController = new AbortController();
-      console.log(
-        `Fetching provider media in Node session=${session} playback=${playback} start=0s url=${url}`
-      );
-      const upstream = await fetch(url, {
-        method: "GET",
-        headers: upstreamHeaders(req),
-        redirect: "follow",
-        signal: abortController.signal,
-      });
-      if (!upstream.ok || !upstream.body) {
-        try { await upstream.body?.cancel(); } catch {}
-        throw new Error(`Provider media request failed with HTTP ${upstream.status}`);
+      let upstream: Response | null = null;
+
+      try {
+        console.log(
+          `Fetching provider media in Node session=${session} playback=${playback} start=0s url=${url}`
+        );
+        upstream = await fetch(url, {
+          method: "GET",
+          headers: upstreamHeaders(req),
+          redirect: "follow",
+          signal: abortController.signal,
+        });
+      } catch (error: any) {
+        console.warn(
+          `Node provider fetch failed; falling back to direct FFmpeg input session=${session} playback=${playback}: ${error?.message || error}`
+        );
       }
 
-      console.log(
-        `Provider media response status=${upstream.status} type=${upstream.headers.get("content-type") || "unknown"} length=${upstream.headers.get("content-length") || "unknown"} finalUrl=${upstream.url || url}`
-      );
+      if (upstream?.ok && upstream.body) {
+        console.log(
+          `Provider media response status=${upstream.status} type=${upstream.headers.get("content-type") || "unknown"} length=${upstream.headers.get("content-length") || "unknown"} finalUrl=${upstream.url || url}`
+        );
 
-      const args = [
-        "-hide_banner", "-loglevel", "info", "-nostdin",
-        "-i", "pipe:0",
-        ...outputArgs,
-      ];
+        const args = [
+          "-hide_banner", "-loglevel", "info", "-nostdin",
+          "-i", "pipe:0",
+          ...outputArgs,
+        ];
 
-      console.log(
-        `Starting generated HLS from Node pipe session=${session} playback=${playback} start=0s source=${upstream.url || url}`
-      );
-      ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "ignore", "pipe"] });
-      readable = Readable.fromWeb(upstream.body as any);
-      readable.on("error", (error: any) => {
-        if (!stopped) {
+        console.log(
+          `Starting generated HLS from Node pipe session=${session} playback=${playback} start=0s source=${upstream.url || url}`
+        );
+        ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "ignore", "pipe"] });
+        readable = Readable.fromWeb(upstream.body as any);
+        readable.on("error", (error: any) => {
+          if (!stopped) {
+            console.warn(
+              `Provider stream error session=${session} playback=${playback}: ${error?.message || error}`
+            );
+          }
+          try { ffmpeg.stdin.destroy(error); } catch {}
+        });
+        ffmpeg.stdin.on("error", (error: any) => {
+          if (!stopped && error?.code !== "EPIPE") {
+            console.warn(
+              `FFmpeg HLS stdin error session=${session} playback=${playback}: ${error?.message || error}`
+            );
+          }
+        });
+        readable.pipe(ffmpeg.stdin);
+      } else {
+        if (upstream) {
+          const status = upstream.status;
+          try { await upstream.body?.cancel(); } catch {}
           console.warn(
-            `Provider stream error session=${session} playback=${playback}: ${error?.message || error}`
+            `Node provider response HTTP ${status}; falling back to direct FFmpeg input session=${session} playback=${playback}`
           );
         }
-        try { ffmpeg.stdin.destroy(error); } catch {}
-      });
-      ffmpeg.stdin.on("error", (error: any) => {
-        if (!stopped && error?.code !== "EPIPE") {
-          console.warn(
-            `FFmpeg HLS stdin error session=${session} playback=${playback}: ${error?.message || error}`
-          );
-        }
-      });
-      readable.pipe(ffmpeg.stdin);
+        try { abortController.abort(); } catch {}
+        abortController = null;
+
+        const args = [
+          "-hide_banner", "-loglevel", "info", "-nostdin",
+          ...ffmpegProviderInputArgs(req, url, 0),
+          ...outputArgs,
+        ];
+        console.log(
+          `Starting generated HLS via direct FFmpeg provider input session=${session} playback=${playback} start=0s source=${url}`
+        );
+        ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
+      }
     }
 
     const stop: StopFn = (reason) => {
