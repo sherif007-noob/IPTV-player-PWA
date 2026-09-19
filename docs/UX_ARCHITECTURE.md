@@ -40,7 +40,7 @@ webOS keeps the header visible for predictable remote navigation.
 
 ### Library
 
-`#main-scrollable-content-grid` / `.library-scroll-stage` is the library scroll surface. The breadcrumb/subheader stays in normal flow within that plane, visually continuing the header chrome at the top but scrolling away with the library instead of becoming a second sticky header.
+`#main-scrollable-content-grid` / `.library-scroll-stage` is the library scroll surface. The breadcrumb/subheader is sticky within that same plane.
 
 This one-scroll-plane approach also avoids the prior iPhone landscape issue caused by nested viewport-height + overflow containers.
 
