@@ -1145,9 +1145,15 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         {!isLive && (
           <div className="mb-4">
             <div className="relative h-11 flex items-center">
-              <div className="relative h-3 w-full rounded-full bg-slate-800 overflow-hidden pointer-events-none">
-                <div className="absolute inset-y-0 left-0 bg-slate-600/60" style={{ width: `${bufferPercent}%` }} />
-                <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-sky-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.65)] transition-[width] duration-300" style={{ width: `${progressPercent}%` }} />
+              <div className="player-seek-track relative h-3 w-full pointer-events-none">
+                <div className="absolute inset-0 rounded-full bg-slate-800 overflow-hidden">
+                  <div className="absolute inset-y-0 left-0 bg-slate-600/60" style={{ width: `${bufferPercent}%` }} />
+                  <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-sky-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.65)] transition-[width] duration-300" style={{ width: `${progressPercent}%` }} />
+                </div>
+                <div
+                  className="player-seek-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-lg shadow-sky-500/40 pointer-events-none transition-[left] duration-75"
+                  style={{ left: `${progressPercent}%` }}
+                />
               </div>
               {scrubTime !== null && duration > 0 && (
                 <div
@@ -1157,10 +1163,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                   {formatTime(scrubTime)}
                 </div>
               )}
-              <div
-                className="player-seek-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-lg shadow-sky-500/40 pointer-events-none transition-[left] duration-75"
-                style={{ left: `${progressPercent}%` }}
-              />
               <div
                 role="slider"
                 tabIndex={duration > 0 ? 0 : -1}
