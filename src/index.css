@@ -1162,21 +1162,23 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
     filter var(--ds-motion-fast) var(--ds-ease-standard);
 }
 #video-player .player-seek-thumb {
-  top: 50% !important;
-  margin: 0 !important;
+  top: 0 !important;
+  margin-top: -2px !important;
   opacity: 0.95;
+  transform: translateX(-50%);
   transform-origin: center;
 }
 #video-player .player-seek-zone:has(.seek-slider:hover) .player-seek-rail,
 #video-player .player-seek-zone:has(.seek-slider:focus-visible) .player-seek-rail {
   box-shadow:
-    0 0 0 1px rgba(56, 189, 248, 0.72),
-    0 0 6px rgba(56, 189, 248, 0.48);
-  filter: brightness(1.08);
+    0 0 8px rgba(56, 189, 248, 0.95),
+    0 0 18px rgba(56, 189, 248, 0.62),
+    0 0 30px rgba(56, 189, 248, 0.30);
+  filter: brightness(1.18);
 }
 #video-player .player-seek-zone:has(.seek-slider:hover) .player-seek-thumb,
 #video-player .player-seek-zone:has(.seek-slider:focus-visible) .player-seek-thumb {
-  transform: translate(-50%, -50%) scale(1.08);
+  transform: translateX(-50%) scale(1.08);
 }
 #video-player .player-scrub-preview {
   z-index: 2;
@@ -1194,6 +1196,7 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   #video-player .player-seek-thumb {
     width: 18px;
     height: 18px;
+    margin-top: -3px !important;
   }
   #video-player .player-top button,
   #video-player .player-bottom button,
@@ -1295,6 +1298,7 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
   #video-player .player-seek-thumb {
     width: 14px;
     height: 14px;
+    margin-top: -1px !important;
   }
 }
 
@@ -1369,17 +1373,17 @@ button:focus-visible, [role=button]:focus-visible, select:focus-visible { outlin
 /* Scrubber thumb: reveal on hover/focus for fine pointers, always visible on touch. */
 @media (hover: hover) and (pointer: fine) {
   #video-player .player-seek-thumb {
-    transform: translate(-50%, -50%) scale(0);
+    transform: translateX(-50%) scale(0);
     transition: left 75ms linear, transform 150ms ease-out;
   }
   #video-player .player-seek-zone:has(.seek-slider:hover) .player-seek-thumb,
   #video-player .player-seek-zone:has(.seek-slider:focus-visible) .player-seek-thumb {
-    transform: translate(-50%, -50%) scale(1);
+    transform: translateX(-50%) scale(1);
   }
 }
 @media (hover: none), (pointer: coarse) {
   #video-player .player-seek-thumb {
-    transform: translate(-50%, -50%) scale(1);
+    transform: translateX(-50%) scale(1);
   }
 }
 

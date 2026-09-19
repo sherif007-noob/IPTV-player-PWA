@@ -1,4 +1,6 @@
 import express from "express";
+import * as http from "http";
+import * as https from "https";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -102,6 +104,69 @@ async function startServer() {
       headers["Client-IP"] = ip;
     }
     return headers;
+  }
+
+  type OpenedUpstream = {
+    response: http.IncomingMessage;
+    request: http.ClientRequest;
+    finalUrl: string;
+  };
+
+  function headerValue(response: http.IncomingMessage, name: string) {
+    const value = response.headers[name.toLowerCase()];
+    if (Array.isArray(value)) return value[0] || null;
+    return value == null ? null : String(value);
+  }
+
+  function openUpstream(
+    urlString: string,
+    method: string,
+    headers: Record<string, string>,
+    redirects = 0
+  ): Promise<OpenedUpstream> {
+    if (redirects > 6) return Promise.reject(new Error("Too many upstream redirects"));
+
+    return new Promise((resolve, reject) => {
+      let parsed: URL;
+      try {
+        parsed = new URL(urlString);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+
+      const client = parsed.protocol === "https:" ? https : http;
+      const request = client.request(parsed, { method, headers }, (response) => {
+        const status = response.statusCode || 0;
+        const location = headerValue(response, "location");
+        if (location && [301, 302, 303, 307, 308].includes(status)) {
+          response.resume();
+          const nextUrl = new URL(location, parsed).toString();
+          const nextMethod = status === 303 && method !== "HEAD" ? "GET" : method;
+          openUpstream(nextUrl, nextMethod, headers, redirects + 1).then(resolve, reject);
+          return;
+        }
+        resolve({ response, request, finalUrl: parsed.toString() });
+      });
+
+      request.setTimeout(120000, () => {
+        request.destroy(new Error("Upstream media request timed out"));
+      });
+      request.on("error", reject);
+      request.end();
+    });
+  }
+
+  async function readStreamText(stream: http.IncomingMessage, maxBytes = 8 * 1024 * 1024) {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of stream) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      total += buffer.length;
+      if (total > maxBytes) throw new Error("Upstream manifest exceeded size limit");
+      chunks.push(buffer);
+    }
+    return Buffer.concat(chunks).toString("utf8");
   }
 
   function validate(urlString: string) {
@@ -226,35 +291,42 @@ async function startServer() {
       const headers: Record<string, string> = { ...input.headers };
       if (typeof req.headers.range === "string") headers.Range = req.headers.range;
 
-      const upstream = await fetch(input.url, {
-        method: req.method,
-        headers,
-        redirect: "follow",
-        signal: AbortSignal.timeout(120000),
-      });
+      const opened = await openUpstream(input.url, req.method, headers);
+      const upstream = opened.response;
+      const status = upstream.statusCode || 502;
 
-      if (!upstream.ok && upstream.status >= 400) {
-        return res.status(upstream.status).send(`Upstream bridge error: ${upstream.status}`);
+      if (status >= 400) {
+        upstream.resume();
+        return res.status(status).send(`Upstream bridge error: ${status}`);
       }
 
       const responseHeaders: Record<string, string> = {
-        "Content-Type": contentType(upstream.headers.get("content-type"), "application/octet-stream"),
-        "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
+        "Content-Type": contentType(headerValue(upstream, "content-type"), "application/octet-stream"),
+        "Accept-Ranges": headerValue(upstream, "accept-ranges") || "bytes",
         "Cache-Control": "no-store",
       };
       for (const key of ["content-length", "content-range", "etag", "last-modified"]) {
-        const value = upstream.headers.get(key);
+        const value = headerValue(upstream, key);
         if (value) responseHeaders[key] = value;
       }
 
-      res.writeHead(upstream.status, responseHeaders);
-      if (req.method === "HEAD" || !upstream.body) return res.end();
+      res.writeHead(status, responseHeaders);
+      if (req.method === "HEAD") {
+        upstream.resume();
+        return res.end();
+      }
 
-      const readable = Readable.fromWeb(upstream.body as any);
-      res.on("close", () => { try { readable.destroy(); } catch {} });
-      return readable.pipe(res);
+      upstream.on("error", (error) => {
+        console.warn(`HLS input upstream stream error token=${req.params.token}: ${error.message}`);
+        if (!res.writableEnded) res.end();
+      });
+      res.on("close", () => {
+        try { upstream.destroy(); } catch {}
+        try { opened.request.destroy(); } catch {}
+      });
+      return upstream.pipe(res);
     } catch (error: any) {
-      console.warn(`HLS input bridge error token=${req.params.token}: ${error?.message || error}`);
+      console.warn(`HLS input bridge core-http error token=${req.params.token}: ${error?.message || error}`);
       if (!res.headersSent) return res.status(502).send("HLS input bridge failed");
     }
   });
@@ -291,96 +363,74 @@ async function startServer() {
     let stopped = false;
     let stderr = "";
     let bridgeToken = "";
-    let readable: Readable | null = null;
-    let abortController: AbortController | null = null;
+    let readable: http.IncomingMessage | null = null;
+    let upstreamRequest: http.ClientRequest | null = null;
 
     let ffmpeg;
     if (start > 0) {
-      // Seeking must not depend on Node/undici being able to reach the provider.
-      // FFmpeg's HTTP stack handles byte-range seeking directly and receives the
-      // same provider identity headers.
+      bridgeToken = `${session}--${playback}`;
+      bridgeInputs.set(bridgeToken, {
+        url,
+        headers: upstreamHeaders(req),
+      });
+
+      const bridgeUrl =
+        `http://127.0.0.1:${PORT}/api/internal/hls-input/${encodeURIComponent(bridgeToken)}`;
       const args = [
         "-hide_banner", "-loglevel", "info", "-nostdin",
-        ...ffmpegProviderInputArgs(req, url, start),
+        "-ss", String(start),
+        "-i", bridgeUrl,
         ...outputArgs,
       ];
+
       console.log(
-        `Starting instant-seek HLS via direct FFmpeg provider input session=${session} playback=${playback} start=${start}s source=${url}`
+        `Starting instant-seek HLS via core-http range bridge session=${session} playback=${playback} start=${start}s source=${url}`
       );
       ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
     } else {
-      abortController = new AbortController();
-      let upstream: Response | null = null;
+      console.log(
+        `Opening provider media with Node core HTTP session=${session} playback=${playback} url=${url}`
+      );
+      const opened = await openUpstream(url, "GET", upstreamHeaders(req));
+      readable = opened.response;
+      upstreamRequest = opened.request;
+      const status = readable.statusCode || 502;
 
-      try {
-        console.log(
-          `Fetching provider media in Node session=${session} playback=${playback} start=0s url=${url}`
-        );
-        upstream = await fetch(url, {
-          method: "GET",
-          headers: upstreamHeaders(req),
-          redirect: "follow",
-          signal: abortController.signal,
-        });
-      } catch (error: any) {
-        console.warn(
-          `Node provider fetch failed; falling back to direct FFmpeg input session=${session} playback=${playback}: ${error?.message || error}`
-        );
+      if (status >= 400) {
+        readable.resume();
+        throw new Error(`Provider media request failed with HTTP ${status}`);
       }
 
-      if (upstream?.ok && upstream.body) {
-        console.log(
-          `Provider media response status=${upstream.status} type=${upstream.headers.get("content-type") || "unknown"} length=${upstream.headers.get("content-length") || "unknown"} finalUrl=${upstream.url || url}`
-        );
+      console.log(
+        `Provider core-http response status=${status} type=${headerValue(readable, "content-type") || "unknown"} length=${headerValue(readable, "content-length") || "unknown"} finalUrl=${opened.finalUrl}`
+      );
 
-        const args = [
-          "-hide_banner", "-loglevel", "info", "-nostdin",
-          "-i", "pipe:0",
-          ...outputArgs,
-        ];
+      const args = [
+        "-hide_banner", "-loglevel", "info", "-nostdin",
+        "-i", "pipe:0",
+        ...outputArgs,
+      ];
+      console.log(
+        `Starting generated HLS from core-http pipe session=${session} playback=${playback} source=${opened.finalUrl}`
+      );
+      ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "ignore", "pipe"] });
 
-        console.log(
-          `Starting generated HLS from Node pipe session=${session} playback=${playback} start=0s source=${upstream.url || url}`
-        );
-        ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "ignore", "pipe"] });
-        readable = Readable.fromWeb(upstream.body as any);
-        readable.on("error", (error: any) => {
-          if (!stopped) {
-            console.warn(
-              `Provider stream error session=${session} playback=${playback}: ${error?.message || error}`
-            );
-          }
-          try { ffmpeg.stdin.destroy(error); } catch {}
-        });
-        ffmpeg.stdin.on("error", (error: any) => {
-          if (!stopped && error?.code !== "EPIPE") {
-            console.warn(
-              `FFmpeg HLS stdin error session=${session} playback=${playback}: ${error?.message || error}`
-            );
-          }
-        });
-        readable.pipe(ffmpeg.stdin);
-      } else {
-        if (upstream) {
-          const status = upstream.status;
-          try { await upstream.body?.cancel(); } catch {}
+      readable.on("error", (error: any) => {
+        if (!stopped) {
           console.warn(
-            `Node provider response HTTP ${status}; falling back to direct FFmpeg input session=${session} playback=${playback}`
+            `Provider core-http stream error session=${session} playback=${playback}: ${error?.message || error}`
           );
         }
-        try { abortController.abort(); } catch {}
-        abortController = null;
-
-        const args = [
-          "-hide_banner", "-loglevel", "info", "-nostdin",
-          ...ffmpegProviderInputArgs(req, url, 0),
-          ...outputArgs,
-        ];
-        console.log(
-          `Starting generated HLS via direct FFmpeg provider input session=${session} playback=${playback} start=0s source=${url}`
-        );
-        ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
-      }
+        try { ffmpeg.stdin.destroy(error); } catch {}
+      });
+      ffmpeg.stdin.on("error", (error: any) => {
+        if (!stopped && error?.code !== "EPIPE") {
+          console.warn(
+            `FFmpeg HLS stdin error session=${session} playback=${playback}: ${error?.message || error}`
+          );
+        }
+      });
+      readable.pipe(ffmpeg.stdin);
     }
 
     const stop: StopFn = (reason) => {
@@ -388,8 +438,8 @@ async function startServer() {
       stopped = true;
       console.log(`Generated HLS stop session=${session} playback=${playback}: ${reason}`);
       if (bridgeToken) bridgeInputs.delete(bridgeToken);
-      try { abortController?.abort(); } catch {}
       try { readable?.destroy(); } catch {}
+      try { upstreamRequest?.destroy(); } catch {}
       try { ffmpeg.stdin?.destroy(); } catch {}
       try { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); } catch {}
       removePathSoon(dir);
@@ -405,8 +455,8 @@ async function startServer() {
 
     ffmpeg.on("error", (error) => {
       if (bridgeToken) bridgeInputs.delete(bridgeToken);
-      try { abortController?.abort(); } catch {}
       try { readable?.destroy(); } catch {}
+      try { upstreamRequest?.destroy(); } catch {}
       console.warn(
         `FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`
       );
@@ -415,8 +465,8 @@ async function startServer() {
 
     ffmpeg.on("close", (code, signal) => {
       if (bridgeToken) bridgeInputs.delete(bridgeToken);
-      try { abortController?.abort(); } catch {}
       try { readable?.destroy(); } catch {}
+      try { upstreamRequest?.destroy(); } catch {}
       clearActive(session, playback);
       console.log(
         `FFmpeg HLS exited code=${code} signal=${signal || "none"} stopped=${stopped} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
@@ -536,21 +586,22 @@ async function startServer() {
 
       const extraHeaders: Record<string, string> = {};
       if (typeof req.headers.range === "string") extraHeaders.Range = req.headers.range;
-      const upstream = await fetch(url, {
-        method: req.method,
-        headers: upstreamHeaders(req, extraHeaders),
-        redirect: "follow",
-        signal: AbortSignal.timeout(120000),
-      });
-      if (!upstream.ok && upstream.status >= 400) {
-        return res.status(upstream.status).send(`Upstream stream error: ${upstream.status}`);
+
+      const opened = await openUpstream(url, req.method, upstreamHeaders(req, extraHeaders));
+      const upstream = opened.response;
+      const status = upstream.statusCode || 502;
+
+      if (status >= 400) {
+        upstream.resume();
+        return res.status(status).send(`Upstream stream error: ${status}`);
       }
 
-      const lower = (upstream.url || url).toLowerCase();
-      const isM3u8 = lower.includes(".m3u8") || contentType(upstream.headers.get("content-type"), "").includes("mpegurl");
+      const lower = opened.finalUrl.toLowerCase();
+      const upstreamType = contentType(headerValue(upstream, "content-type"), "");
+      const isM3u8 = lower.includes(".m3u8") || upstreamType.includes("mpegurl");
       if (isM3u8 && req.method === "GET") {
-        const body = rewriteM3u8(await upstream.text(), upstream.url || url, req);
-        res.writeHead(upstream.status, {
+        const body = rewriteM3u8(await readStreamText(upstream), opened.finalUrl, req);
+        res.writeHead(status, {
           "Content-Type": "application/vnd.apple.mpegurl",
           "Content-Length": Buffer.byteLength(body),
           "Cache-Control": "no-cache,no-store",
@@ -559,24 +610,39 @@ async function startServer() {
       }
 
       const type = contentType(
-        upstream.headers.get("content-type"),
-        lower.includes(".ts") ? "video/mp2t" : lower.includes(".webm") ? "video/webm" : "application/octet-stream"
+        headerValue(upstream, "content-type"),
+        lower.includes(".ts") ? "video/mp2t" :
+        lower.includes(".mp4") ? "video/mp4" :
+        lower.includes(".mkv") ? "video/x-matroska" :
+        lower.includes(".webm") ? "video/webm" :
+        "application/octet-stream"
       );
       const responseHeaders: Record<string, string> = {
         "Content-Type": type,
-        "Accept-Ranges": upstream.headers.get("accept-ranges") || "bytes",
+        "Accept-Ranges": headerValue(upstream, "accept-ranges") || "bytes",
       };
       for (const key of ["content-length", "content-range", "etag", "last-modified", "cache-control"]) {
-        const value = upstream.headers.get(key);
+        const value = headerValue(upstream, key);
         if (value) responseHeaders[key] = value;
       }
-      res.writeHead(upstream.status, responseHeaders);
-      if (req.method === "HEAD" || !upstream.body) return res.end();
-      const readable = Readable.fromWeb(upstream.body as any);
-      res.on("close", () => { try { readable.destroy(); } catch {} });
-      return readable.pipe(res);
+
+      res.writeHead(status, responseHeaders);
+      if (req.method === "HEAD") {
+        upstream.resume();
+        return res.end();
+      }
+
+      upstream.on("error", (streamError) => {
+        console.warn(`Core HTTP stream pipe notice: ${streamError.message}`);
+        if (!res.writableEnded) res.end();
+      });
+      res.on("close", () => {
+        try { upstream.destroy(); } catch {}
+        try { opened.request.destroy(); } catch {}
+      });
+      return upstream.pipe(res);
     } catch (error: any) {
-      console.error("Proxy stream error:", error.stack || error);
+      console.error("Proxy stream core-http error:", error.stack || error);
       if (!res.headersSent) return res.status(502).send(`Upstream stream proxy error: ${error.message || error}`);
     }
   });
