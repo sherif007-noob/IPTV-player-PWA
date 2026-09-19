@@ -4,6 +4,7 @@ import os from "os";
 import path from "path";
 import { Readable } from "stream";
 import { spawn } from "child_process";
+import { setDefaultResultOrder } from "node:dns";
 import ffmpegPath from "ffmpeg-static";
 import { createServer as createViteServer } from "vite";
 
@@ -15,6 +16,12 @@ const ALLOWED_IPTV_HOSTS = process.env.ALLOWED_IPTV_HOSTS
   : [];
 const PORT = Number(process.env.PORT || 8080);
 const HLS_ROOT = path.join(os.tmpdir(), `iptv-player-hls-${PORT}`);
+
+// IPTV providers frequently publish IPv4 endpoints alongside unusable or flaky IPv6 routes.
+// Node/Undici otherwise follows the OS resolver order, which can surface only as a generic
+// `TypeError: fetch failed`. Prefer IPv4 for provider/API traffic while keeping the existing
+// fetch/HLS architecture unchanged.
+setDefaultResultOrder("ipv4first");
 
 type StopFn = (reason: string) => void;
 
@@ -102,6 +109,23 @@ async function startServer() {
       headers["Client-IP"] = ip;
     }
     return headers;
+  }
+
+  function describeNetworkError(error: any) {
+    const message = String(error?.message || error || "unknown error");
+    const cause = error?.cause;
+    if (!cause) return message;
+
+    const details = [
+      cause.code ? `code=${cause.code}` : "",
+      cause.errno ? `errno=${cause.errno}` : "",
+      cause.syscall ? `syscall=${cause.syscall}` : "",
+      cause.address ? `address=${cause.address}` : "",
+      cause.port ? `port=${cause.port}` : "",
+      cause.message ? `message=${cause.message}` : "",
+    ].filter(Boolean).join(" ");
+
+    return details ? `${message} | cause: ${details}` : message;
   }
 
   function validate(urlString: string) {
@@ -237,7 +261,7 @@ async function startServer() {
       res.on("close", () => { try { readable.destroy(); } catch {} });
       return readable.pipe(res);
     } catch (error: any) {
-      console.warn(`HLS input bridge error token=${req.params.token}: ${error?.message || error}`);
+      console.warn(`HLS input bridge error token=${req.params.token}: ${describeNetworkError(error)}`);
       if (!res.headersSent) return res.status(502).send("HLS input bridge failed");
     }
   });
@@ -303,12 +327,17 @@ async function startServer() {
       console.log(
         `Fetching provider media in Node session=${session} playback=${playback} start=0s url=${url}`
       );
-      const upstream = await fetch(url, {
-        method: "GET",
-        headers: upstreamHeaders(req),
-        redirect: "follow",
-        signal: abortController.signal,
-      });
+      let upstream: Response;
+      try {
+        upstream = await fetch(url, {
+          method: "GET",
+          headers: upstreamHeaders(req),
+          redirect: "follow",
+          signal: abortController.signal,
+        });
+      } catch (error: any) {
+        throw new Error(`Provider fetch failed: ${describeNetworkError(error)}`, { cause: error });
+      }
       if (!upstream.ok || !upstream.body) {
         try { await upstream.body?.cancel(); } catch {}
         throw new Error(`Provider media request failed with HTTP ${upstream.status}`);
