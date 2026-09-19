@@ -13,6 +13,9 @@ const PROVIDER_ORIGIN = process.env.PROVIDER_ORIGIN || "";
 const ALLOWED_IPTV_HOSTS = process.env.ALLOWED_IPTV_HOSTS
   ? process.env.ALLOWED_IPTV_HOSTS.split(",").map((host) => host.trim().toLowerCase())
   : [];
+const FORWARD_CLIENT_IP_HEADERS = /^(1|true|yes)$/i.test(
+  String(process.env.FORWARD_CLIENT_IP_HEADERS || "")
+);
 const PORT = Number(process.env.PORT || 8080);
 const HLS_ROOT = path.join(os.tmpdir(), `iptv-player-hls-${PORT}`);
 
@@ -95,11 +98,18 @@ async function startServer() {
     if (ua) headers["User-Agent"] = ua;
     if (referer) headers.Referer = referer;
     if (origin) headers.Origin = origin;
-    const ip = getClientIp(req);
-    if (ip) {
-      headers["X-Forwarded-For"] = ip;
-      headers["X-Real-IP"] = ip;
-      headers["Client-IP"] = ip;
+    // Never invent/forward client identity by default. On a local app this would
+    // otherwise send 127.0.0.1/::1 to the IPTV provider, and on an internet-facing
+    // deployment arbitrary X-Forwarded-For values may be spoofed unless the reverse
+    // proxy chain is explicitly trusted. Opt in only when the deployment is configured
+    // for it and the provider genuinely requires these headers.
+    if (FORWARD_CLIENT_IP_HEADERS) {
+      const ip = getClientIp(req);
+      if (ip) {
+        headers["X-Forwarded-For"] = ip;
+        headers["X-Real-IP"] = ip;
+        headers["Client-IP"] = ip;
+      }
     }
     return headers;
   }
@@ -564,9 +574,12 @@ async function startServer() {
     app.get("*", (_req, res) => res.sendFile(path.join(dist, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () =>
-    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT} (universal HLS playback)`)
-  );
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT} (universal HLS playback)`);
+    console.log(
+      `Provider client-IP forwarding: ${FORWARD_CLIENT_IP_HEADERS ? "enabled" : "disabled"}`
+    );
+  });
 }
 
 startServer();
