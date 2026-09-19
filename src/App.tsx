@@ -674,10 +674,15 @@ export default function App() {
       url = channel?.direct_source || xtreamService.getStreamUrl('live', item.id);
     } else if (item.type === 'vod') {
       const ext = item.container_extension;
-      url = xtreamService.getStreamUrl('vod', item.id, ext);
+      url = xtreamService.getStreamUrl('vod', item.id, ext, item.direct_source);
     } else if (item.type === 'series' && seriesMeta) {
       const ext = seriesMeta.episode.container_extension;
-      url = xtreamService.getStreamUrl('series', seriesMeta.episode.id, ext);
+      url = xtreamService.getStreamUrl(
+        'series',
+        seriesMeta.episode.id,
+        ext,
+        seriesMeta.episode.direct_source
+      );
     }
 
     setActivePlayer({
@@ -871,6 +876,7 @@ export default function App() {
             category_id: movie.category_id,
             icon: movie.stream_icon,
             container_extension: (movie as any).container_extension || 'mp4',
+            direct_source: (movie as any).direct_source,
           },
           recent.timestamp
         );
@@ -944,6 +950,7 @@ export default function App() {
       rating: m.rating,
       year: m.year,
       container_extension: m.container_extension,
+      direct_source: m.direct_source,
       is4k: m.is4k,
     }));
   }, [movies]);

@@ -508,6 +508,9 @@ export class XtreamService {
           rating_5based: item.rating_5based,
           category_id: String(item.category_id || ''),
           container_extension: item.container_extension || 'mp4',
+          direct_source: typeof item.direct_source === 'string' && item.direct_source.trim()
+            ? item.direct_source.trim()
+            : undefined,
           year: item.year ? String(item.year) : undefined,
           is4k: /4k|uhd|2160/i.test(item.name || ''),
         }));
@@ -650,9 +653,11 @@ export class XtreamService {
   public getStreamUrl(
     type: 'live' | 'vod' | 'series',
     streamId: string | number,
-    extension?: string
+    extension?: string,
+    directSource?: string
   ): string {
-    const streamTarget = this.getDirectStreamTarget(type, streamId, extension);
+    const suppliedDirectSource = typeof directSource === 'string' ? directSource.trim() : '';
+    const streamTarget = suppliedDirectSource || this.getDirectStreamTarget(type, streamId, extension);
     const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
     const isHttpsBrowser = typeof window !== 'undefined' && window.location.protocol === 'https:';
     

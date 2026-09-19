@@ -3,8 +3,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { Readable } from "stream";
-import { spawn, spawnSync } from "child_process";
-import ffmpegStaticPath from "ffmpeg-static";
+import { spawn } from "child_process";
+import ffmpegPath from "ffmpeg-static";
 import { createServer as createViteServer } from "vite";
 
 const PROVIDER_USER_AGENT = process.env.PROVIDER_USER_AGENT || "IPTVSmartersPlayer/3.0.0";
@@ -15,43 +15,6 @@ const ALLOWED_IPTV_HOSTS = process.env.ALLOWED_IPTV_HOSTS
   : [];
 const PORT = Number(process.env.PORT || 8080);
 const HLS_ROOT = path.join(os.tmpdir(), `iptv-player-hls-${PORT}`);
-
-
-function canRunExecutable(command: string) {
-  try {
-    const probe = spawnSync(command, ["-version"], {
-      stdio: "ignore",
-      timeout: 5000,
-      windowsHide: true,
-    });
-    return !probe.error && probe.status === 0;
-  } catch {
-    return false;
-  }
-}
-
-function resolveFfmpegExecutable() {
-  const configured = String(process.env.FFMPEG_PATH || "").trim();
-  if (configured && canRunExecutable(configured)) {
-    return { path: configured, source: "FFMPEG_PATH" };
-  }
-
-  // Prefer the host FFmpeg build when available. It uses the OS networking/runtime
-  // instead of the bundled static build and is generally the most compatible choice
-  // for provider HTTP redirects on Linux desktops.
-  if (canRunExecutable("ffmpeg")) {
-    return { path: "ffmpeg", source: "system PATH" };
-  }
-
-  if (ffmpegStaticPath && canRunExecutable(ffmpegStaticPath)) {
-    return { path: ffmpegStaticPath, source: "ffmpeg-static fallback" };
-  }
-
-  return { path: "", source: "unavailable" };
-}
-
-const FFMPEG = resolveFfmpegExecutable();
-
 
 type StopFn = (reason: string) => void;
 
@@ -141,23 +104,6 @@ async function startServer() {
     return headers;
   }
 
-  function describeNetworkError(error: any) {
-    const message = String(error?.message || error || "unknown error");
-    const cause = error?.cause;
-    if (!cause) return message;
-
-    const details = [
-      cause.code ? `code=${cause.code}` : "",
-      cause.errno ? `errno=${cause.errno}` : "",
-      cause.syscall ? `syscall=${cause.syscall}` : "",
-      cause.address ? `address=${cause.address}` : "",
-      cause.port ? `port=${cause.port}` : "",
-      cause.message ? `message=${cause.message}` : "",
-    ].filter(Boolean).join(" ");
-
-    return details ? `${message} | cause: ${details}` : message;
-  }
-
   function validate(urlString: string) {
     if (!urlString) return "Missing URL";
     let parsed: URL;
@@ -226,7 +172,7 @@ async function startServer() {
   const hlsTranscodeArgs = () => [
     "-map", "0:v:0", "-map", "0:a:0?",
     "-c:v", "libx264", "-preset", "superfast", "-tune", "zerolatency",
-    "-profile:v", "main", "-level:v", "3.1", "-pix_fmt", "yuv420p",
+    "-profile:v", "main", "-level:v", "4.1", "-pix_fmt", "yuv420p",
     "-bf", "0", "-refs", "1", "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
     "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
     "-avoid_negative_ts", "make_zero",
@@ -291,7 +237,7 @@ async function startServer() {
       res.on("close", () => { try { readable.destroy(); } catch {} });
       return readable.pipe(res);
     } catch (error: any) {
-      console.warn(`HLS input bridge error token=${req.params.token}: ${describeNetworkError(error)}`);
+      console.warn(`HLS input bridge error token=${req.params.token}: ${error?.message || error}`);
       if (!res.headersSent) return res.status(502).send("HLS input bridge failed");
     }
   });
@@ -303,7 +249,7 @@ async function startServer() {
     playback: string,
     start: number
   ) {
-    if (!FFMPEG.path) throw new Error("FFmpeg is unavailable");
+    if (!ffmpegPath) throw new Error("FFmpeg is unavailable");
     if (active.get(session)?.playback === playback) return;
 
     stopActive(session, undefined, "new playback for same player session");
@@ -312,59 +258,132 @@ async function startServer() {
     const dir = hlsDir(session, playback);
     await fs.promises.mkdir(dir, { recursive: true });
 
-    const headers = upstreamHeaders(req);
-    const ffmpegHeaders = Object.entries(headers)
-      .filter(([key]) => !["user-agent", "referer", "host"].includes(key.toLowerCase()))
-      .map(([key, value]) => `${key}: ${value}`)
-      .join("\r\n");
     const playlist = path.join(dir, "index.m3u8");
     const segmentPattern = path.join(dir, "segment-%06d.ts");
-    const args = [
-      "-hide_banner", "-loglevel", "info", "-nostdin",
-      "-re",
-      ...(start > 0 ? ["-ss", String(start)] : []),
-      "-user_agent", headers["User-Agent"] || PROVIDER_USER_AGENT,
-      ...(headers.Referer ? ["-referer", headers.Referer] : []),
-      ...(ffmpegHeaders ? ["-headers", `${ffmpegHeaders}\r\n`] : []),
-      "-rw_timeout", "120000000",
-      "-i", url,
+    const outputArgs = [
       ...hlsTranscodeArgs(),
       "-f", "hls",
       "-hls_time", "2",
-      "-hls_list_size", "8",
-      "-hls_delete_threshold", "3",
-      "-hls_flags", "delete_segments+independent_segments+temp_file",
+      "-hls_list_size", "0",
+      "-hls_playlist_type", "event",
+      "-hls_flags", "independent_segments+temp_file",
       "-hls_segment_filename", segmentPattern,
       playlist,
     ];
 
-    console.log(`Starting generated HLS session=${session} playback=${playback} start=${start}s inputUrl=${url}`);
-    const ffmpeg = spawn(FFMPEG.path, args, { stdio: ["ignore", "ignore", "pipe"] });
     let stopped = false;
     let stderr = "";
+    let bridgeToken = "";
+    let readable: Readable | null = null;
+    let abortController: AbortController | null = null;
+
+    let ffmpeg;
+    if (start > 0) {
+      bridgeToken = `${session}--${playback}`;
+      bridgeInputs.set(bridgeToken, {
+        url,
+        headers: upstreamHeaders(req),
+      });
+
+      const bridgeUrl =
+        `http://127.0.0.1:${PORT}/api/internal/hls-input/${encodeURIComponent(bridgeToken)}`;
+      const args = [
+        "-hide_banner", "-loglevel", "info", "-nostdin",
+        "-ss", String(start),
+        "-i", bridgeUrl,
+        ...outputArgs,
+      ];
+
+      console.log(
+        `Starting instant-seek HLS via Node range bridge session=${session} playback=${playback} start=${start}s source=${url}`
+      );
+      ffmpeg = spawn(ffmpegPath, args, { stdio: ["ignore", "ignore", "pipe"] });
+    } else {
+      abortController = new AbortController();
+      console.log(
+        `Fetching provider media in Node session=${session} playback=${playback} start=0s url=${url}`
+      );
+      const upstream = await fetch(url, {
+        method: "GET",
+        headers: upstreamHeaders(req),
+        redirect: "follow",
+        signal: abortController.signal,
+      });
+      if (!upstream.ok || !upstream.body) {
+        try { await upstream.body?.cancel(); } catch {}
+        throw new Error(`Provider media request failed with HTTP ${upstream.status}`);
+      }
+
+      console.log(
+        `Provider media response status=${upstream.status} type=${upstream.headers.get("content-type") || "unknown"} length=${upstream.headers.get("content-length") || "unknown"} finalUrl=${upstream.url || url}`
+      );
+
+      const args = [
+        "-hide_banner", "-loglevel", "info", "-nostdin",
+        "-i", "pipe:0",
+        ...outputArgs,
+      ];
+
+      console.log(
+        `Starting generated HLS from Node pipe session=${session} playback=${playback} start=0s source=${upstream.url || url}`
+      );
+      ffmpeg = spawn(ffmpegPath, args, { stdio: ["pipe", "ignore", "pipe"] });
+      readable = Readable.fromWeb(upstream.body as any);
+      readable.on("error", (error: any) => {
+        if (!stopped) {
+          console.warn(
+            `Provider stream error session=${session} playback=${playback}: ${error?.message || error}`
+          );
+        }
+        try { ffmpeg.stdin.destroy(error); } catch {}
+      });
+      ffmpeg.stdin.on("error", (error: any) => {
+        if (!stopped && error?.code !== "EPIPE") {
+          console.warn(
+            `FFmpeg HLS stdin error session=${session} playback=${playback}: ${error?.message || error}`
+          );
+        }
+      });
+      readable.pipe(ffmpeg.stdin);
+    }
 
     const stop: StopFn = (reason) => {
       if (stopped) return;
       stopped = true;
       console.log(`Generated HLS stop session=${session} playback=${playback}: ${reason}`);
+      if (bridgeToken) bridgeInputs.delete(bridgeToken);
+      try { abortController?.abort(); } catch {}
+      try { readable?.destroy(); } catch {}
+      try { ffmpeg.stdin?.destroy(); } catch {}
       try { if (!ffmpeg.killed) ffmpeg.kill("SIGKILL"); } catch {}
       removePathSoon(dir);
     };
 
     register(session, playback, stop);
+
     ffmpeg.stderr.on("data", (chunk) => {
       const text = chunk.toString();
       stderr = (stderr + text).slice(-8000);
       console.log(`FFmpeg HLS: ${text.trimEnd()}`);
     });
+
     ffmpeg.on("error", (error) => {
-      console.warn(`FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`);
+      if (bridgeToken) bridgeInputs.delete(bridgeToken);
+      try { abortController?.abort(); } catch {}
+      try { readable?.destroy(); } catch {}
+      console.warn(
+        `FFmpeg HLS spawn error session=${session} playback=${playback}: ${error.message}`
+      );
       clearActive(session, playback);
     });
+
     ffmpeg.on("close", (code, signal) => {
+      if (bridgeToken) bridgeInputs.delete(bridgeToken);
+      try { abortController?.abort(); } catch {}
+      try { readable?.destroy(); } catch {}
       clearActive(session, playback);
       console.log(
-        `FFmpeg HLS exited code=${code} signal=${signal || "none"} stopped=${stopped} binary=${FFMPEG.source} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
+        `FFmpeg HLS exited code=${code} signal=${signal || "none"} stopped=${stopped} session=${session} playback=${playback}; ${stderr.trim().slice(-1800) || "no diagnostics"}`
       );
       if (!stopped) removePathSoon(dir, 5 * 60 * 1000);
     });
@@ -530,7 +549,7 @@ async function startServer() {
     status: "ok",
     device: "webos-iptv-player",
     playbackTransport: "hls",
-    ffmpegAvailable: !!FFMPEG.path,
+    ffmpegAvailable: !!ffmpegPath,
     activeTranscodes: active.size,
     hlsRoot: HLS_ROOT,
     upstreamUserAgent: PROVIDER_USER_AGENT,
@@ -545,10 +564,9 @@ async function startServer() {
     app.get("*", (_req, res) => res.sendFile(path.join(dist, "index.html")));
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT} (universal HLS playback)`);
-    console.log(`FFmpeg runtime: ${FFMPEG.source}${FFMPEG.path ? ` (${FFMPEG.path})` : ""}`);
-  });
+  app.listen(PORT, "0.0.0.0", () =>
+    console.log(`WebOS Xtream IPTV server running on http://0.0.0.0:${PORT} (universal HLS playback)`)
+  );
 }
 
 startServer();
