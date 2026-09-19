@@ -73,25 +73,7 @@ function isProviderHls(value: string): boolean {
 }
 
 function usesGeneratedHls(value: string): boolean {
-  const upstream = getUpstreamUrl(value);
-  return !!upstream && /\.mkv$/i.test(upstream.pathname);
-}
-
-function preferMp4ProxyVariant(value: string): string {
-  const parsed = parseUrl(value);
-  if (!parsed || !parsed.pathname.endsWith('/api/xtream/stream')) return value;
-  const rawUpstream = parsed.searchParams.get('url');
-  if (!rawUpstream) return value;
-
-  try {
-    const upstream = new URL(rawUpstream);
-    if (!/\.mkv$/i.test(upstream.pathname)) return value;
-    upstream.pathname = upstream.pathname.replace(/\.mkv$/i, '.mp4');
-    parsed.searchParams.set('url', upstream.toString());
-    return parsed.toString();
-  } catch {
-    return value;
-  }
+  return !!getUpstreamUrl(value) && !isProviderHls(value);
 }
 
 function getSourceStart(value: string): number {
@@ -119,7 +101,6 @@ function withPlaybackIdentity(value: string, session: string, playback: string):
 }
 
 function toHlsPlaybackUrl(value: string): string {
-  if (!usesGeneratedHls(value)) return value;
   const parsed = canonicalProxyUrl(value);
   const upstream = getUpstreamUrl(value);
   if (!parsed || !upstream) return value;
@@ -310,7 +291,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const seekCursorRef = useRef(Math.max(0, initialTime));
   const pendingSeekRef = useRef<{ target: number; resume: boolean } | null>(null);
   const seekRestartTimerRef = useRef<number | null>(null);
-  const originalMkvFallbackRef = useRef<string | null>(null);
 
   const feedbackTimerRef = useRef<number | null>(null);
   const controlsTimerRef = useRef<number | null>(null);
@@ -523,10 +503,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }, [activeUrl, metadataDuration]);
 
   useEffect(() => {
-    const preferredStreamUrl = preferMp4ProxyVariant(streamUrl);
-    originalMkvFallbackRef.current = preferredStreamUrl !== streamUrl ? streamUrl : null;
-    const generated = usesGeneratedHls(preferredStreamUrl);
-    const next = buildPlaybackUrl(preferredStreamUrl, generated && initialTime > 0 ? initialTime : undefined);
+    const generated = usesGeneratedHls(streamUrl);
+    const next = buildPlaybackUrl(streamUrl, generated && initialTime > 0 ? initialTime : undefined);
     initialNativeSeekRef.current = generated ? 0 : Math.max(0, initialTime);
     resumeAfterSourceChangeRef.current = true;
     setActiveUrl(next);
@@ -584,17 +562,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       else safePause();
     };
 
-    const hlsMedia = isProviderHls(activeUrl) || usesGeneratedHls(activeUrl);
-    const nativeHls = hlsMedia && !!video.canPlayType('application/vnd.apple.mpegurl');
-
-    if (nativeHls) {
-      metadataHandler = onReady;
-      video.addEventListener('loadedmetadata', metadataHandler, { once: true });
-      video.preload = 'auto';
-      video.src = mediaUrl;
-      video.load();
-      console.log(`Native HLS playback: ${mediaUrl}`);
-    } else if (hlsMedia && Hls.isSupported()) {
+    const nativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
+    if (Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -618,14 +587,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           setIsBuffering(false);
         }
       });
-      console.log(`hls.js playback: ${mediaUrl}`);
-    } else {
+      console.log(`Universal HLS (hls.js): ${mediaUrl}`);
+    } else if (nativeHls) {
       metadataHandler = onReady;
       video.addEventListener('loadedmetadata', metadataHandler, { once: true });
       video.preload = 'auto';
       video.src = mediaUrl;
       video.load();
-      console.log(`Direct media playback: ${mediaUrl}`);
+      console.log(`Universal HLS (native): ${mediaUrl}`);
+    } else {
+      setIsBuffering(false);
+      setPlaybackError('This browser does not support HLS playback.');
     }
 
     return () => {
@@ -960,26 +932,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             const video = event.currentTarget;
             const error = video.error;
             if (error?.code === MediaError.MEDIA_ERR_ABORTED) return;
-
-            const mkvFallback = originalMkvFallbackRef.current;
-            if (mkvFallback && !usesGeneratedHls(activeUrl)) {
-              originalMkvFallbackRef.current = null;
-              const target = Math.max(0, currentTime || initialTime || 0);
-              const next = buildPlaybackUrl(mkvFallback, target > 0 ? target : undefined);
-              console.warn('Preferred MP4 variant failed; falling back to MKV generated HLS.');
-              resumeAfterSourceChangeRef.current = true;
-              initialNativeSeekRef.current = 0;
-              setPlaybackError(null);
-              setIsBuffering(true);
-              setActiveUrl(next);
-              return;
-            }
-
             const detail = error?.message || `media error ${error?.code || 'unknown'}`;
-            console.warn('Video playback error:', detail, 'src=', video.currentSrc || activeUrl);
+            console.warn('HLS video playback error:', detail, 'src=', video.currentSrc || activeUrl);
             setIsBuffering(false);
             setIsPlaying(false);
-            setPlaybackError(`The media stream could not be loaded (${detail}).`);
+            setPlaybackError(`The HLS stream could not be loaded (${detail}).`);
           }}
           onEnded={() => {
             recordProgress();
@@ -1187,14 +1144,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         <div className="player-osd-surface player-osd-bottom glass-chrome mx-auto max-w-6xl rounded-2xl p-3 sm:p-4">
         {!isLive && (
           <div className="mb-4">
-            <div className="player-seek-zone relative h-11 flex items-center">
+            <div className="relative h-11 flex items-center">
               <div className="player-seek-track relative h-3 w-full pointer-events-none">
-                <div className="player-seek-rail absolute inset-0 rounded-full bg-slate-800 overflow-hidden">
+                <div className="absolute inset-0 rounded-full bg-slate-800 overflow-hidden">
                   <div className="absolute inset-y-0 left-0 bg-slate-600/60" style={{ width: `${bufferPercent}%` }} />
                   <div className="absolute inset-y-0 left-0 bg-gradient-to-r from-sky-500 to-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.65)] transition-[width] duration-300" style={{ width: `${progressPercent}%` }} />
                 </div>
                 <div
-                  className="player-seek-thumb absolute w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-lg shadow-sky-500/40 pointer-events-none transition-[left] duration-75"
+                  className="player-seek-thumb absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-sky-500 shadow-lg shadow-sky-500/40 pointer-events-none transition-[left] duration-75"
                   style={{ left: `${progressPercent}%` }}
                 />
               </div>
@@ -1214,7 +1171,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                 aria-valuemin={0} aria-valuemax={duration || 1}
                 aria-valuenow={scrubTime ?? Math.min(currentTime, duration || 1)}
                 aria-disabled={!(duration > 0)}
-                className="seek-slider absolute inset-0 w-full h-full cursor-pointer touch-none outline-none"
+                className="seek-slider tv-focus absolute inset-0 w-full h-full cursor-pointer touch-none rounded-full"
                 onPointerDown={(event) => {
                   if (!event.isPrimary || event.button !== 0 || !(duration > 0)) return;
                   event.preventDefault();
